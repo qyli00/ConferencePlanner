@@ -41,20 +41,9 @@ You can also deep-link directly:
 - `http://localhost:8000/planner.html?conference=ndss-2026`
 - `http://localhost:8000/planner.html?conference=chi-2026`
 
-## Crawl or refresh data
+## Datasets
 
-```bash
-python3 scripts/crawl_ndss_2026.py
-python3 scripts/crawl_chi_2026.py
-```
-
-Optional faster CHI crawl (skip paper content detail pages):
-
-```bash
-python3 scripts/crawl_chi_2026.py --skip-content-details
-```
-
-Outputs:
+Bundled dataset files:
 
 - NDSS normalized dataset: `data/ndss2026/ndss-2026.json`
 - CHI normalized dataset: `data/chi2026/chi-2026.json`

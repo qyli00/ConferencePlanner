@@ -1,4 +1,4 @@
-# Conference Planner (NDSS + CHI)
+# Conference Planner
 
 Browser-based planner for conference schedules with a shared data model across conferences.
 

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conference Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css?v=20260306-3" />
+  </head>
+  <body>
+    <div class="bg bg-a"></div>
+    <div class="bg bg-b"></div>
+
+    <header class="hero">
+      <div class="hero-top">
+        <p id="conferenceEyebrow" class="eyebrow">Conference Planner</p>
+        <a id="backToLandingBtn" class="btn secondary hero-back-link" href="./index.html">Back to Conference Selection</a>
+      </div>
+      <h1 id="conferenceTitle">Plan Your Conference Week</h1>
+      <p id="conferenceSubtitle" class="subtitle">
+        Browse by day and time, mark sessions or papers, and finalize your schedule in calendar view.
+      </p>
+    </header>
+
+    <main class="layout">
+      <div class="view-switcher">
+        <div class="view-tabs" role="tablist" aria-label="Main views">
+          <button id="programTabBtn" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="programTabPanel">
+            Program by Day
+          </button>
+          <button id="calendarTabBtn" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="calendarTabPanel">
+            Calendar View
+          </button>
+        </div>
+        <button id="toggleControlsBtn" class="btn secondary tabs-controls-toggle" type="button">Hide Controls</button>
+      </div>
+
+      <section id="programTabPanel" class="panel explorer" role="tabpanel" aria-labelledby="programTabBtn">
+        <div id="programControlsWrap" class="program-controls-wrap">
+          <div id="programPanelHead" class="panel-head">
+            <h2 id="programPanelTitle">Program by Day</h2>
+            <p id="explorerStats"></p>
+            <div id="explorerActions" class="explorer-actions">
+              <button id="expandAllBtn" class="btn secondary">Expand All Sessions</button>
+              <button id="collapseAllBtn" class="btn secondary">Collapse All Sessions</button>
+              <button id="resetSelectionsBtn" class="btn secondary">Reset Selections</button>
+              <button id="saveProfileBtn" class="btn secondary">Save Preferences</button>
+              <label class="file-btn">
+                Load Preferences
+                <input id="loadProfileInput" type="file" accept=".json,application/json" />
+              </label>
+            </div>
+          </div>
+          <div id="programFilters" class="program-filters">
+            <div class="toolbar">
+              <div class="field grow">
+                <label for="searchInput">Search sessions, papers, authors, abstracts</label>
+                <input id="searchInput" type="search" placeholder="e.g., fuzzing, rowhammer, privacy..." />
+              </div>
+              <div class="field">
+                <label for="dayFilter">Day</label>
+                <select id="dayFilter"></select>
+              </div>
+              <div class="field">
+                <label for="kindFilter">Type</label>
+                <select id="kindFilter"></select>
+              </div>
+              <div class="field">
+                <label for="sessionTagFilter">Paper Session Tag</label>
+                <select id="sessionTagFilter"></select>
+              </div>
+              <div class="field">
+                <label for="priorityFilter">Priority</label>
+                <select id="priorityFilter">
+                  <option value="all">All</option>
+                  <option value="selected">Interested + Must-Go</option>
+                  <option value="must_go">Must-Go Only</option>
+                </select>
+              </div>
+            </div>
+            <p id="statusMessage" class="status">Loading local dataset...</p>
+          </div>
+        </div>
+        <div id="dayBoards" class="day-boards"></div>
+      </section>
+
+      <section id="calendarTabPanel" class="panel planner hidden" role="tabpanel" aria-labelledby="calendarTabBtn">
+        <div class="panel-head">
+          <h2>Week Calendar Review</h2>
+          <p id="plannerStats"></p>
+          <div class="planner-actions">
+            <div class="planner-action-row">
+              <button id="addCustomEventBtn" class="btn secondary">Add Custom Event</button>
+            </div>
+            <div class="planner-action-row planner-export-row">
+              <button id="confirmUndecidedBtn" class="btn secondary">Confirm Undecided</button>
+              <button id="removeUndecidedBtn" class="btn secondary">Remove Undecided</button>
+              <button id="exportIcsBtn" class="btn secondary export-btn">Export to Calendar</button>
+            </div>
+          </div>
+        </div>
+        <div id="customEventFormWrap" class="custom-event-form hidden">
+          <div class="field grow">
+            <label for="customTitle">Title</label>
+            <input id="customTitle" type="text" placeholder="Coffee chat, hallway meeting, side event..." />
+          </div>
+          <div class="field">
+            <label for="customDate">Date</label>
+            <input id="customDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="customStartTime">Start</label>
+            <input id="customStartTime" type="time" />
+          </div>
+          <div class="field">
+            <label for="customEndTime">End</label>
+            <input id="customEndTime" type="time" />
+          </div>
+          <div class="field">
+            <label for="customPriority">Priority</label>
+            <select id="customPriority">
+              <option value="interested">Interested</option>
+              <option value="must_go">Must-Go</option>
+            </select>
+          </div>
+          <div class="field grow">
+            <label for="customLocation">Location</label>
+            <input id="customLocation" type="text" placeholder="Lobby, Room 201..." />
+          </div>
+          <div class="field grow">
+            <label for="customNotes">Notes</label>
+            <input id="customNotes" type="text" placeholder="Person/topic/etc." />
+          </div>
+          <div class="custom-form-actions">
+            <button id="saveCustomEventBtn" class="btn primary">Save Event</button>
+            <button id="cancelCustomEventBtn" class="btn secondary">Cancel</button>
+          </div>
+        </div>
+        <div class="review-layout">
+          <div id="weekCalendar" class="week-calendar"></div>
+          <aside id="eventDetails" class="event-details"></aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js?v=20260306-3"></script>
+  </body>
+</html>

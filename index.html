@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conference Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef3ea;
+        --surface: rgba(255, 255, 255, 0.95);
+        --text: #10231c;
+        --muted: #446054;
+        --line: #d4e2d9;
+        --accent: #0d7f59;
+        --chip: #e6f2ec;
+        --chip-text: #1a5b45;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(820px 540px at 84% -12%, #d1efda 0%, transparent 62%),
+          radial-gradient(860px 560px at -8% 112%, #f6d1bb 0%, transparent 56%),
+          var(--bg);
+        display: grid;
+        place-items: center;
+        padding: clamp(1rem, 3vw, 2.5rem);
+      }
+
+      .shell {
+        width: min(960px, 100%);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--surface);
+        box-shadow: 0 24px 48px rgba(13, 34, 23, 0.13);
+        padding: clamp(1rem, 3vw, 2rem);
+      }
+
+      .eyebrow {
+        margin: 0;
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 0.34rem 0.56rem;
+        font-size: 0.74rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #14503c;
+        background: #def2e5;
+      }
+
+      h1 {
+        margin: 0.66rem 0 0.46rem;
+        line-height: 1.06;
+        font-size: clamp(1.62rem, 3vw, 2.3rem);
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .flow {
+        margin-top: 1rem;
+      }
+
+      .flow-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 0.7rem;
+        align-items: stretch;
+      }
+
+      .mock-panel {
+        padding: 0.2rem 0;
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .panel-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+
+      .panel-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.42rem;
+        border-radius: 999px;
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        background: #e9f5ee;
+        color: #17543f;
+      }
+
+      .panel-title {
+        font-size: 0.72rem;
+        color: #466458;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      .mock-tabs {
+        display: inline-flex;
+        border: 1px solid #d6e2da;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #eef6f0;
+        width: fit-content;
+      }
+
+      .mock-tab {
+        padding: 0.34rem 0.56rem;
+        font-size: 0.62rem;
+        color: #3b5a4d;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        border-right: 1px solid #d6e2da;
+      }
+
+      .mock-tab:last-child {
+        border-right: 0;
+      }
+
+      .mock-tab.active {
+        background: #fff;
+        color: #173a2b;
+      }
+
+      .mock-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+        gap: 0.3rem;
+      }
+
+      .mock-input,
+      .mock-select {
+        border: 1px solid #d6e3da;
+        border-radius: 9px;
+        background: #fcfffd;
+        font-size: 0.6rem;
+        color: #4a675b;
+        padding: 0.3rem 0.36rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      .day-board {
+        border: 1px solid #dde9e1;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #f8fcf9, #ffffff);
+        padding: 0.42rem;
+        display: grid;
+        gap: 0.36rem;
+      }
+
+      .day-board-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.4rem;
+        font-size: 0.61rem;
+        color: #3f6254;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      .program-list {
+        display: grid;
+        gap: 0.38rem;
+      }
+
+      .parallel-sessions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.38rem;
+        align-items: start;
+      }
+
+      .session-preview {
+        border: 1px solid #dbe7e0;
+        border-radius: 11px;
+        background: #fbfefc;
+      }
+
+      .session-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.34rem;
+        padding: 0.42rem 0.48rem;
+      }
+
+      .session-preview.expanded .session-head {
+        border-bottom: 1px solid #e4eee8;
+      }
+
+      .chevron {
+        width: 0.95rem;
+        height: 0.95rem;
+        color: #40685a;
+        flex: none;
+      }
+
+      .session-title {
+        font-size: 0.7rem;
+        line-height: 1.2;
+        color: #24453a;
+        font-weight: 600;
+      }
+
+      .session-meta {
+        font-size: 0.58rem;
+        color: #58756a;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      .choice-group {
+        margin-left: 0;
+        display: flex;
+        gap: 0.2rem;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+      }
+
+      .choice-chip {
+        border-radius: 999px;
+        border: 1px solid #d0e1d6;
+        background: #f3faf6;
+        color: #285341;
+        font-size: 0.56rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        padding: 0.06rem 0.3rem;
+        white-space: nowrap;
+      }
+
+      .choice-chip.active-none {
+        border-color: #d0e1d6;
+        background: #f3faf6;
+        color: #285341;
+      }
+
+      .choice-chip.active-interest {
+        border-color: #a4d2bb;
+        background: #e4f5ec;
+      }
+
+      .choice-chip.active-must {
+        border-color: #ebc8a8;
+        background: #fbeede;
+        color: #8a4c22;
+      }
+
+      .session-papers {
+        display: grid;
+        gap: 0.28rem;
+        padding: 0.38rem 0.44rem 0.44rem;
+      }
+
+      .paper-row {
+        border: 1px solid #deebe4;
+        border-radius: 9px;
+        background: #fcfffd;
+        padding: 0.28rem 0.34rem;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.18rem;
+        align-items: start;
+      }
+
+      .paper-title {
+        font-size: 0.63rem;
+        color: #315347;
+      }
+
+      .time-chip {
+        border-radius: 10px;
+        border: 1px solid #dfebe4;
+        background: #f8fcfa;
+        color: #37564b;
+        font-size: 0.65rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        display: grid;
+        place-items: center;
+        padding: 0.44rem 0.2rem;
+      }
+
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: 54px repeat(3, minmax(0, 1fr));
+        gap: 0.3rem;
+      }
+
+      .calendar-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+        gap: 0.35rem;
+      }
+
+      .day-chip {
+        border: 1px solid #d8e7de;
+        border-radius: 9px;
+        background: #f9fcfa;
+        color: #36554a;
+        font-size: 0.64rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        text-align: center;
+        padding: 0.3rem 0.2rem;
+      }
+
+      .day-cell {
+        border: 1px solid #deebe4;
+        border-radius: 9px;
+        min-height: 3.15rem;
+        padding: 0.22rem;
+        background: #fcfffd;
+      }
+
+      .event {
+        border-radius: 8px;
+        padding: 0.2rem 0.25rem;
+        font-size: 0.62rem;
+        line-height: 1.2;
+        color: #244338;
+        background: #f4f7f5;
+        border: 1px solid #d0ddd2;
+        border-left: 5px solid #96ab9f;
+      }
+
+      .event.confirmed {
+        color: #1f523d;
+        background: #dcf5e7;
+        border-color: #95deb9;
+        border-left-color: #0f8b63;
+      }
+
+      .event.cancelled {
+        color: #8a2b2f;
+        background: #ffe4e4;
+        border-color: #eca1a1;
+        border-left-color: #c53f34;
+        text-decoration: line-through;
+      }
+
+      .event.undecided {
+        color: #3f5f4f;
+        background: #f4f7f5;
+        border-color: #d0ddd2;
+        border-left-color: #96ab9f;
+      }
+
+      .details-card {
+        border: 1px solid #deebe4;
+        border-radius: 10px;
+        background: #fcfffd;
+        padding: 0.34rem 0.38rem;
+        display: grid;
+        gap: 0.26rem;
+      }
+
+      .details-title {
+        margin: 0;
+        font-size: 0.67rem;
+        color: #1d4133;
+      }
+
+      .details-row {
+        margin: 0;
+        font-size: 0.6rem;
+        color: #476458;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      .details-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.24rem;
+      }
+
+      .details-actions .decision-btn {
+        min-height: auto;
+        border: 1px solid #cfe1d6;
+        border-radius: 999px;
+        background: #f3faf6;
+        color: #24483a;
+        box-shadow: none;
+        font-size: 0.58rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 600;
+        padding: 0.14rem 0.46rem;
+      }
+
+      .details-actions .decision-btn.is-active {
+        border-color: #a5d4be;
+        background: #e3f5ec;
+      }
+
+      .panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.34rem;
+      }
+
+      .mock-export-btn {
+        min-height: auto;
+        border: 1px solid #c9e0d3;
+        border-radius: 999px;
+        background: #e9f4ee;
+        color: #1f5440;
+        box-shadow: none;
+        font-size: 0.64rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 600;
+        padding: 0.24rem 0.54rem;
+      }
+
+      .connector {
+        display: grid;
+        place-items: center;
+        min-width: 2.4rem;
+      }
+
+      .connector-icon {
+        width: 2rem;
+        height: 2rem;
+        padding: 0.35rem;
+        border-radius: 999px;
+        border: 1px solid #cfe2d6;
+        background: #f4faf7;
+        color: #0b6f4d;
+      }
+
+      .selector {
+        margin-top: 1.2rem;
+        padding-top: 1.1rem;
+        border-top: 1px solid #e2ebe5;
+      }
+
+      label {
+        display: block;
+        font-size: 0.88rem;
+        color: #315045;
+        margin-bottom: 0.45rem;
+      }
+
+      .row {
+        display: flex;
+        gap: 0.62rem;
+      }
+
+      select {
+        flex: 1;
+        min-height: 2.8rem;
+        border-radius: 12px;
+        border: 1px solid #bed2c6;
+        background: #fff;
+        padding: 0.6rem 0.7rem;
+        font: inherit;
+      }
+
+      button {
+        min-height: 2.8rem;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        padding: 0.6rem 0.95rem;
+        font: inherit;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(140deg, var(--accent), #0a714f);
+        box-shadow: 0 10px 16px rgba(10, 113, 79, 0.22);
+        cursor: pointer;
+      }
+
+      .hint {
+        margin: 0.9rem 0 0;
+        font-size: 0.82rem;
+        color: #537063;
+      }
+
+      code {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.8rem;
+      }
+
+      @media (max-width: 620px) {
+        .row {
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 840px) {
+        .flow-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .connector {
+          min-height: 1.6rem;
+          transform: rotate(90deg);
+        }
+
+        .calendar-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .parallel-sessions {
+          grid-template-columns: 1fr;
+        }
+
+        .mock-toolbar {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell" aria-label="Conference selector">
+      <p class="eyebrow">Conference Planner</p>
+      <h1 id="landingTitle">Planning your conference week in CHI 2026</h1>
+      <p class="subtitle">Browse sessions, mark interests, and confirm your schedule in calendar view.</p>
+
+      <section class="flow" aria-label="Planner workflow preview">
+        <div class="flow-grid">
+          <article class="mock-panel">
+            <div class="panel-bar">
+              <span class="panel-tag">Program View</span>
+            </div>
+            <div class="mock-toolbar" aria-hidden="true">
+              <div class="mock-input">Search sessions, papers, authors...</div>
+              <div class="mock-select">Day: Tuesday</div>
+              <div class="mock-select">Type: All</div>
+            </div>
+            <div class="program-list">
+              <div class="day-board">
+                <div class="day-board-head">
+                  <strong>Tuesday, April 14</strong>
+                  <span>09:00-10:15</span>
+                </div>
+                <div class="parallel-sessions">
+                  <div class="session-preview expanded">
+                    <div class="session-head">
+                      <svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="session-title">Session 1</span>
+                      <span class="session-meta">Tue Apr 14 · 09:00</span>
+                    </div>
+                    <div class="session-papers">
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 1</span>
+                        <div class="choice-group">
+                          <span class="choice-chip">None</span>
+                          <span class="choice-chip active-interest">Interested</span>
+                          <span class="choice-chip">Must-Go</span>
+                        </div>
+                      </div>
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 2</span>
+                        <div class="choice-group">
+                          <span class="choice-chip">None</span>
+                          <span class="choice-chip">Interested</span>
+                          <span class="choice-chip active-must">Must-Go</span>
+                        </div>
+                      </div>
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 3</span>
+                        <div class="choice-group">
+                          <span class="choice-chip active-none">None</span>
+                          <span class="choice-chip">Interested</span>
+                          <span class="choice-chip">Must-Go</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="session-preview">
+                    <div class="session-head">
+                      <svg class="chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                      <span class="session-title">Session 2</span>
+                      <span class="session-meta">Tue Apr 14 · 09:00</span>
+                    </div>
+                    <div class="session-papers">
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 1</span>
+                        <div class="choice-group">
+                          <span class="choice-chip active-none">None</span>
+                          <span class="choice-chip">Interested</span>
+                          <span class="choice-chip">Must-Go</span>
+                        </div>
+                      </div>
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 2</span>
+                        <div class="choice-group">
+                          <span class="choice-chip">None</span>
+                          <span class="choice-chip active-interest">Interested</span>
+                          <span class="choice-chip">Must-Go</span>
+                        </div>
+                      </div>
+                      <div class="paper-row">
+                        <span class="paper-title">Paper 3</span>
+                        <div class="choice-group">
+                          <span class="choice-chip">None</span>
+                          <span class="choice-chip">Interested</span>
+                          <span class="choice-chip active-must">Must-Go</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <div class="connector" aria-hidden="true">
+            <svg class="connector-icon" viewBox="0 0 24 24" fill="none" role="img" aria-label="Flow arrow">
+              <path
+                d="M5 12h14M13 6l6 6-6 6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+
+          <article class="mock-panel">
+            <div class="panel-bar">
+              <div class="panel-actions">
+                <span class="panel-tag">Calendar View</span>
+                <button class="mock-export-btn" type="button">Export to Calendar</button>
+              </div>
+              <span class="panel-title">Final Plan</span>
+            </div>
+            <div class="calendar-layout">
+              <div class="calendar-grid">
+                <div class="day-chip"></div>
+                <div class="day-chip">Tue</div>
+                <div class="day-chip">Wed</div>
+                <div class="day-chip">Thu</div>
+
+                <div class="time-chip">09:00</div>
+                <div class="day-cell">
+                  <div class="event confirmed">Session 1 - Paper 2</div>
+                </div>
+                <div class="day-cell">
+                  <div class="event undecided">Session 1 - Paper 1</div>
+                </div>
+                <div class="day-cell"></div>
+
+                <div class="time-chip">11:15</div>
+                <div class="day-cell">
+                  <div class="event cancelled">Session 3</div>
+                </div>
+                <div class="day-cell"></div>
+                <div class="day-cell">
+                  <div class="event undecided">Session 2</div>
+                </div>
+
+                <div class="time-chip">14:30</div>
+                <div class="day-cell">
+                  <div class="event confirmed">Meet-Up</div>
+                </div>
+                <div class="day-cell">
+                  <div class="event cancelled">Session 2 - Paper 3</div>
+                </div>
+                <div class="day-cell"></div>
+              </div>
+              <aside class="details-card">
+                <h3 class="details-title">Selected Event</h3>
+                <p class="details-row">Type: Paper</p>
+                <p class="details-row">Priority: Must-Go</p>
+                <p class="details-row">Session: Session 1</p>
+                <p class="details-row">Location: Room A</p>
+                <div class="details-actions" aria-label="Final decision">
+                  <button class="decision-btn is-active" type="button">Attend</button>
+                  <button class="decision-btn" type="button">Maybe</button>
+                  <button class="decision-btn" type="button">Not Go</button>
+                </div>
+                <p class="details-row">Notes: Personal notes</p>
+              </aside>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <form id="conferenceForm" class="selector">
+        <label for="conferencePicker">Select conference</label>
+        <div class="row">
+          <select id="conferencePicker" name="conference">
+            <option value="chi-2026">CHI 2026</option>
+            <option value="ndss-2026">NDSS 2026</option>
+          </select>
+          <button type="submit">Open Planner</button>
+        </div>
+      </form>
+    </main>
+
+    <script>
+      (function initLandingPage() {
+        const validConferenceIds = new Set(["ndss-2026", "chi-2026"]);
+        const conferenceLabels = {
+          "ndss-2026": "NDSS 2026",
+          "chi-2026": "CHI 2026",
+        };
+        const params = new URLSearchParams(window.location.search);
+        const initialConference = params.get("conference");
+
+        function openPlanner(conferenceId) {
+          const resolvedId = validConferenceIds.has(conferenceId) ? conferenceId : "chi-2026";
+          const target = new URL("./planner.html", window.location.href);
+          target.searchParams.set("conference", resolvedId);
+          window.location.assign(target.toString());
+        }
+
+        if (initialConference) {
+          openPlanner(initialConference);
+          return;
+        }
+
+        const form = document.getElementById("conferenceForm");
+        const picker = document.getElementById("conferencePicker");
+        const landingTitle = document.getElementById("landingTitle");
+        const updateLandingTitle = () => {
+          const selected = validConferenceIds.has(picker.value) ? picker.value : "chi-2026";
+          landingTitle.textContent = `Planning your conference week in ${conferenceLabels[selected]}`;
+        };
+        updateLandingTitle();
+        picker.addEventListener("change", updateLandingTitle);
+        form.addEventListener("submit", (event) => {
+          event.preventDefault();
+          openPlanner(picker.value);
+        });
+      })();
+    </script>
+  </body>
+</html>

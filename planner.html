@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260306-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260306-4" />
   </head>
   <body>
     <div class="bg bg-a"></div>
@@ -90,55 +90,57 @@
       </section>
 
       <section id="calendarTabPanel" class="panel planner hidden" role="tabpanel" aria-labelledby="calendarTabBtn">
-        <div class="panel-head">
-          <h2>Week Calendar Review</h2>
-          <p id="plannerStats"></p>
-          <div class="planner-actions">
-            <div class="planner-action-row">
-              <button id="addCustomEventBtn" class="btn secondary">Add Custom Event</button>
+        <div id="calendarControlsWrap" class="calendar-controls-wrap">
+          <div class="panel-head">
+            <h2>Week Calendar Review</h2>
+            <p id="plannerStats"></p>
+            <div class="planner-actions">
+              <div class="planner-action-row">
+                <button id="addCustomEventBtn" class="btn secondary">Add Custom Event</button>
+              </div>
+              <div class="planner-action-row planner-export-row">
+                <button id="confirmUndecidedBtn" class="btn secondary">Confirm Undecided</button>
+                <button id="removeUndecidedBtn" class="btn secondary">Remove Undecided</button>
+                <button id="exportIcsBtn" class="btn secondary export-btn">Export to Calendar</button>
+              </div>
             </div>
-            <div class="planner-action-row planner-export-row">
-              <button id="confirmUndecidedBtn" class="btn secondary">Confirm Undecided</button>
-              <button id="removeUndecidedBtn" class="btn secondary">Remove Undecided</button>
-              <button id="exportIcsBtn" class="btn secondary export-btn">Export to Calendar</button>
+          </div>
+          <div id="customEventFormWrap" class="custom-event-form hidden">
+            <div class="field grow">
+              <label for="customTitle">Title</label>
+              <input id="customTitle" type="text" placeholder="Coffee chat, hallway meeting, side event..." />
             </div>
-          </div>
-        </div>
-        <div id="customEventFormWrap" class="custom-event-form hidden">
-          <div class="field grow">
-            <label for="customTitle">Title</label>
-            <input id="customTitle" type="text" placeholder="Coffee chat, hallway meeting, side event..." />
-          </div>
-          <div class="field">
-            <label for="customDate">Date</label>
-            <input id="customDate" type="date" />
-          </div>
-          <div class="field">
-            <label for="customStartTime">Start</label>
-            <input id="customStartTime" type="time" />
-          </div>
-          <div class="field">
-            <label for="customEndTime">End</label>
-            <input id="customEndTime" type="time" />
-          </div>
-          <div class="field">
-            <label for="customPriority">Priority</label>
-            <select id="customPriority">
-              <option value="interested">Interested</option>
-              <option value="must_go">Must-Go</option>
-            </select>
-          </div>
-          <div class="field grow">
-            <label for="customLocation">Location</label>
-            <input id="customLocation" type="text" placeholder="Lobby, Room 201..." />
-          </div>
-          <div class="field grow">
-            <label for="customNotes">Notes</label>
-            <input id="customNotes" type="text" placeholder="Person/topic/etc." />
-          </div>
-          <div class="custom-form-actions">
-            <button id="saveCustomEventBtn" class="btn primary">Save Event</button>
-            <button id="cancelCustomEventBtn" class="btn secondary">Cancel</button>
+            <div class="field">
+              <label for="customDate">Date</label>
+              <input id="customDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="customStartTime">Start</label>
+              <input id="customStartTime" type="time" />
+            </div>
+            <div class="field">
+              <label for="customEndTime">End</label>
+              <input id="customEndTime" type="time" />
+            </div>
+            <div class="field">
+              <label for="customPriority">Priority</label>
+              <select id="customPriority">
+                <option value="interested">Interested</option>
+                <option value="must_go">Must-Go</option>
+              </select>
+            </div>
+            <div class="field grow">
+              <label for="customLocation">Location</label>
+              <input id="customLocation" type="text" placeholder="Lobby, Room 201..." />
+            </div>
+            <div class="field grow">
+              <label for="customNotes">Notes</label>
+              <input id="customNotes" type="text" placeholder="Person/topic/etc." />
+            </div>
+            <div class="custom-form-actions">
+              <button id="saveCustomEventBtn" class="btn primary">Save Event</button>
+              <button id="cancelCustomEventBtn" class="btn secondary">Cancel</button>
+            </div>
           </div>
         </div>
         <div class="review-layout">
@@ -148,6 +150,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260306-3"></script>
+    <script src="./app.js?v=20260306-4"></script>
   </body>
 </html>

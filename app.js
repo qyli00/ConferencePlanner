@@ -113,6 +113,7 @@ const el = {
   programControlsWrap: document.getElementById("programControlsWrap"),
   programPanelHead: document.getElementById("programPanelHead"),
   calendarTabPanel: document.getElementById("calendarTabPanel"),
+  calendarControlsWrap: document.getElementById("calendarControlsWrap"),
   toggleControlsBtn: document.getElementById("toggleControlsBtn"),
   explorerActions: document.getElementById("explorerActions"),
   programFilters: document.getElementById("programFilters"),
@@ -202,7 +203,7 @@ function bindEvents() {
   el.expandAllBtn.addEventListener("click", () => {
     if (!state.data) return;
     for (const session of getVisibleSessions()) {
-      if (session.paperIds?.length) state.expandedSessionIds.add(session.id);
+      if (canExpandSessionCard(session)) state.expandedSessionIds.add(session.id);
     }
     renderDayBoards();
   });
@@ -659,12 +660,6 @@ function isPaperLikeTrack(track) {
   return PAPERLIKE_TRACK_HINTS.some((hint) => lower.includes(hint));
 }
 
-function shouldShowAuthorsForPaper(paper) {
-  const track = normalizeTrackLabel(paper?.track);
-  if (!track) return true;
-  return !isNonPaperTrack(track);
-}
-
 function coerceDays(rawDays, sessions) {
   const daysById = new Map();
 
@@ -780,6 +775,9 @@ function renderProgramControlsVisibility() {
   if (el.programControlsWrap) {
     el.programControlsWrap.classList.toggle("hidden", !isVisible);
   }
+  if (el.calendarControlsWrap) {
+    el.calendarControlsWrap.classList.toggle("hidden", !isVisible);
+  }
   if (el.programTabPanel) {
     el.programTabPanel.classList.toggle("controls-collapsed", !isVisible);
   }
@@ -861,7 +859,7 @@ function renderDayBoard(day, sessions) {
 
   const slots = groupSessionsBySlot(sessions);
   for (const slot of slots) {
-    const expandableSessions = slot.sessions.filter((session) => (session.paperIds || []).length > 0);
+    const expandableSessions = slot.sessions.filter((session) => canExpandSessionCard(session));
     const allExpanded = expandableSessions.length > 0 && expandableSessions.every((session) => state.expandedSessionIds.has(session.id));
     const maxParallelPerRow = getMaxParallelPerRow();
     const slotParallelCount = Math.max(1, Math.min(maxParallelPerRow, slot.sessions.length));
@@ -910,10 +908,44 @@ function renderDayBoard(day, sessions) {
   return board;
 }
 
+function isSessionPaperExpandable(session) {
+  return session?.kind === "technical" && (session.paperIds || []).length > 0;
+}
+
+function shouldShowSessionDetailsToggle(session) {
+  return String(session?.kind || "").toLowerCase() !== "technical";
+}
+
+function canExpandSessionCard(session) {
+  return isSessionPaperExpandable(session) || shouldShowSessionDetailsToggle(session);
+}
+
+function getSessionDetailsSummary(session) {
+  return String(session?.subtitle || "").trim() || "No additional details for this session.";
+}
+
+function toggleSessionExpanded(sessionId) {
+  if (state.expandedSessionIds.has(sessionId)) state.expandedSessionIds.delete(sessionId);
+  else state.expandedSessionIds.add(sessionId);
+}
+
+function shouldShowSessionTrackBadge(session) {
+  const track = normalizeTrackLabel(session?.track);
+  if (!track) return false;
+  const trackLower = track.toLowerCase();
+  const kindLabel = normalizeTrackLabel(KIND_LABEL[session?.kind] || session?.kind);
+  if (kindLabel && trackLower === kindLabel.toLowerCase()) return false;
+  if (session?.kind === "technical" && isGenericPaperTrack(track)) return false;
+  return true;
+}
+
 function renderSessionCard(session, visiblePapers) {
   const card = document.createElement("article");
   card.className = "session-card";
   const shownPapers = Array.isArray(visiblePapers) ? visiblePapers : [];
+  const isPaperSession = isSessionPaperExpandable(session);
+  const hasDetailsToggle = shouldShowSessionDetailsToggle(session);
+  const isExpanded = state.expandedSessionIds.has(session.id);
 
   const head = document.createElement("div");
   head.className = "session-head";
@@ -930,9 +962,10 @@ function renderSessionCard(session, visiblePapers) {
   const paperBadge = state.filters.search
     ? `${shownPapers.length}/${totalPapers} papers`
     : `${totalPapers} papers`;
+  const kindLabel = KIND_LABEL[session.kind] || session.kind;
   badges.innerHTML = [
-    badgeHtml(KIND_LABEL[session.kind] || session.kind),
-    session.track ? badgeHtml(session.track) : "",
+    badgeHtml(kindLabel),
+    shouldShowSessionTrackBadge(session) ? badgeHtml(session.track) : "",
     totalPapers ? badgeHtml(paperBadge) : "",
   ].join("");
 
@@ -963,14 +996,12 @@ function renderSessionCard(session, visiblePapers) {
     })
   );
 
-  if ((session.paperIds || []).length > 0) {
+  if (isPaperSession || hasDetailsToggle) {
     const expandBtn = document.createElement("button");
     expandBtn.className = "expand-btn";
-    const expanded = state.expandedSessionIds.has(session.id);
-    expandBtn.textContent = expanded ? "Hide Papers" : "Show Papers";
+    expandBtn.textContent = isPaperSession ? (isExpanded ? "Hide Papers" : "Show Papers") : isExpanded ? "Hide Details" : "Show Details";
     expandBtn.addEventListener("click", () => {
-      if (state.expandedSessionIds.has(session.id)) state.expandedSessionIds.delete(session.id);
-      else state.expandedSessionIds.add(session.id);
+      toggleSessionExpanded(session.id);
       renderDayBoards();
     });
     actions.appendChild(expandBtn);
@@ -979,19 +1010,38 @@ function renderSessionCard(session, visiblePapers) {
   head.appendChild(actions);
   card.appendChild(head);
 
-  if ((session.paperIds || []).length > 0) {
+  if (isPaperSession || hasDetailsToggle) {
     const body = document.createElement("div");
-    body.className = `session-body ${state.expandedSessionIds.has(session.id) ? "" : "hidden"}`.trim();
-    const papersLabel = document.createElement("p");
-    papersLabel.className = "papers-label";
-    papersLabel.textContent = "Papers";
-    body.appendChild(papersLabel);
+    body.className = `session-body ${isExpanded ? "" : "hidden"}`.trim();
+    if (isPaperSession) {
+      const papersLabel = document.createElement("p");
+      papersLabel.className = "papers-label";
+      papersLabel.textContent = "Papers";
+      body.appendChild(papersLabel);
 
-    for (const paper of shownPapers) {
-      body.appendChild(renderPaperCard(paper, session));
-    }
-    if (!shownPapers.length) {
-      body.appendChild(createEmpty("No papers in this session match the current search/filter."));
+      for (const paper of shownPapers) {
+        body.appendChild(renderPaperCard(paper, session));
+      }
+      if (!shownPapers.length) {
+        body.appendChild(createEmpty("No papers in this session match the current search/filter."));
+      }
+    } else {
+      const detailsLabel = document.createElement("p");
+      detailsLabel.className = "papers-label";
+      detailsLabel.textContent = "Details";
+      const detailsText = document.createElement("p");
+      detailsText.className = "session-details-text";
+      detailsText.textContent = getSessionDetailsSummary(session);
+      body.append(detailsLabel, detailsText);
+      if (session.sourceUrl) {
+        const sourceLink = document.createElement("a");
+        sourceLink.className = "session-details-link";
+        sourceLink.href = session.sourceUrl;
+        sourceLink.target = "_blank";
+        sourceLink.rel = "noreferrer";
+        sourceLink.textContent = "Open Session Source";
+        body.appendChild(sourceLink);
+      }
     }
     card.appendChild(body);
   }
@@ -1054,17 +1104,10 @@ function renderPaperCard(paper, session) {
   abstract.className = "abstract";
   const details = document.createElement("details");
   const summary = document.createElement("summary");
-  summary.textContent = paper.abstract || paper.authorsText ? "Show Details" : "Details unavailable";
+  summary.textContent = paper.abstract ? "Show Details" : "Details unavailable";
   details.appendChild(summary);
   const content = document.createElement("div");
   content.className = "abstract-content";
-  content.textContent = "";
-  if (paper.authorsText) {
-    const authors = document.createElement("p");
-    authors.className = "paper-authors";
-    authors.textContent = `Authors: ${paper.authorsText}`;
-    content.appendChild(authors);
-  }
   const abstractText = document.createElement("p");
   abstractText.className = "paper-authors";
   abstractText.textContent = paper.abstract || "No abstract found in source data.";
@@ -1203,24 +1246,6 @@ function getPaperAuthorsData(paper, maxAuthors = 3) {
     truncated: true,
     remaining: 0,
   };
-}
-
-function getPaperAuthorsDisplayText(paper) {
-  if (Array.isArray(paper.authors) && paper.authors.length) {
-    const names = paper.authors
-      .map((author) => String(author?.name || "").trim())
-      .filter(Boolean);
-    if (names.length) return names.join(", ");
-  }
-
-  const fallback = String(paper.authorsText || "").trim();
-  if (!fallback) return "";
-  const withoutAffiliations = fallback
-    .replace(/\s*\([^)]*\)/g, "")
-    .replace(/\s+,/g, ",")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-  return withoutAffiliations || fallback;
 }
 
 function getPaperInstitutionsData(paper, maxInstitutions = 2) {
@@ -1472,28 +1497,6 @@ function renderEventDetails(items) {
     list.appendChild(detailRow("Session Detail", session.subtitle));
   }
 
-  let authorsWrap = null;
-  if (active.entityType === "paper" && paper && shouldShowAuthorsForPaper(paper)) {
-    authorsWrap = document.createElement("div");
-    authorsWrap.className = "details-authors";
-    const authorsTitle = document.createElement("p");
-    authorsTitle.className = "details-row";
-    authorsTitle.innerHTML = "<strong>Authors</strong>";
-    const authorsText = document.createElement("p");
-    authorsText.className = "details-row";
-    const paperAuthorsDisplay = getPaperAuthorsDisplayText(paper);
-    authorsText.textContent = paperAuthorsDisplay || "Authors not listed.";
-    authorsWrap.append(authorsTitle, authorsText);
-
-    const institutions = getPaperInstitutionsData(paper);
-    if (institutions.fullText) {
-      const institutionsText = document.createElement("p");
-      institutionsText.className = "details-row";
-      institutionsText.innerHTML = `<strong>Institutions:</strong> ${escapeHtml(institutions.fullText)}`;
-      authorsWrap.appendChild(institutionsText);
-    }
-  }
-
   const decisionGroup = document.createElement("div");
   decisionGroup.className = "decision-group";
   for (const option of DECISIONS) {
@@ -1541,7 +1544,7 @@ function renderEventDetails(items) {
     detailsLinkBtn.href = active.detailsUrl;
     detailsLinkBtn.target = "_blank";
     detailsLinkBtn.rel = "noreferrer";
-    detailsLinkBtn.textContent = "Open Paper Details";
+    detailsLinkBtn.textContent = active.entityType === "paper" ? "Open Paper Details" : "Open Session Details";
     linkRow.appendChild(detailsLinkBtn);
   }
 
@@ -1595,7 +1598,6 @@ function renderEventDetails(items) {
   bottomActions.append(decisionGroup, actionRow);
 
   card.append(title, meta, list, bottomActions, noteWrap);
-  if (authorsWrap) card.appendChild(authorsWrap);
   card.appendChild(abstractWrap);
   if (linkRow.childElementCount > 0) card.appendChild(linkRow);
   el.eventDetails.appendChild(card);

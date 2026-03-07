@@ -613,6 +613,25 @@ select:focus {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
+.session-details-text {
+  margin: 0;
+  color: #344f42;
+  font-size: 0.81rem;
+  line-height: 1.36;
+  white-space: pre-wrap;
+}
+
+.session-details-link {
+  color: #0d6f4e;
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.session-details-link:hover {
+  text-decoration: underline;
+}
+
 .paper-card {
   border: 1px solid #deeadf;
   border-left: 4px solid #94b8a2;

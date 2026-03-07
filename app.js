@@ -35,6 +35,16 @@ const KIND_LABEL = {
   event: "Event",
   logistics: "Logistics",
 };
+const BADGE_ALIAS_MAP = new Map([
+  ["keynotes", "keynote"],
+  ["awards", "award"],
+  ["workshops", "workshop"],
+  ["panels", "panel"],
+  ["papers", "paper"],
+  ["meetups", "meetup"],
+  ["meet-ups", "meet-up"],
+  ["journals", "journal"],
+]);
 const GENERIC_PAPER_TRACKS = new Set(["paper", "papers"]);
 const PAPERLIKE_TRACK_HINTS = ["papers", "journal", "src"];
 const MEETUP_TRACK_HINTS = ["meet-up", "meetup"];
@@ -93,7 +103,6 @@ const state = {
   eventNotes: {},
   customEvents: [],
   showCustomForm: false,
-  showProgramControls: true,
   activeCalendarItemId: "",
   activeTab: "program",
   profileStorageKey: "",
@@ -110,11 +119,7 @@ const el = {
   programTabBtn: document.getElementById("programTabBtn"),
   calendarTabBtn: document.getElementById("calendarTabBtn"),
   programTabPanel: document.getElementById("programTabPanel"),
-  programControlsWrap: document.getElementById("programControlsWrap"),
-  programPanelHead: document.getElementById("programPanelHead"),
   calendarTabPanel: document.getElementById("calendarTabPanel"),
-  calendarControlsWrap: document.getElementById("calendarControlsWrap"),
-  toggleControlsBtn: document.getElementById("toggleControlsBtn"),
   explorerActions: document.getElementById("explorerActions"),
   programFilters: document.getElementById("programFilters"),
   expandAllBtn: document.getElementById("expandAllBtn"),
@@ -158,9 +163,6 @@ async function init() {
 function bindEvents() {
   el.programTabBtn.addEventListener("click", () => setActiveTab("program"));
   el.calendarTabBtn.addEventListener("click", () => setActiveTab("calendar"));
-  window.addEventListener("resize", () => {
-    updateProgramViewportHeight();
-  });
 
   el.searchInput.addEventListener("input", (event) => {
     state.filters.search = event.target.value.trim().toLowerCase();
@@ -193,17 +195,11 @@ function bindEvents() {
     });
   }
 
-  if (el.toggleControlsBtn) {
-    el.toggleControlsBtn.addEventListener("click", () => {
-      state.showProgramControls = !state.showProgramControls;
-      renderProgramControlsVisibility();
-    });
-  }
-
   el.expandAllBtn.addEventListener("click", () => {
     if (!state.data) return;
     for (const session of getVisibleSessions()) {
-      if (canExpandSessionCard(session)) state.expandedSessionIds.add(session.id);
+      if (!canExpandSessionCard(session)) continue;
+      state.expandedSessionIds.add(session.id);
     }
     renderDayBoards();
   });
@@ -506,11 +502,28 @@ function coerceSessions(rawSessions, conference) {
       end: String(raw.end || ""),
       location: String(raw.location || "TBD"),
       sourceUrl: String(raw.sourceUrl || ""),
+      details: coerceSessionDetails(raw.details),
       paperIds: Array.isArray(raw.paperIds) ? raw.paperIds.map((idValue) => String(idValue)) : [],
       priority: normalizeLevel(raw.priority || "none"),
     });
   }
   return result;
+}
+
+function coerceSessionDetails(rawDetails) {
+  const details = rawDetails && typeof rawDetails === "object" ? rawDetails : {};
+  const authors = Array.isArray(details.authors)
+    ? details.authors
+        .map((author) => (typeof author === "string" ? author : author?.name))
+        .map((name) => String(name || "").trim())
+        .filter(Boolean)
+    : [];
+  const authorsText = String(details.authorsText || "").trim() || authors.join(", ");
+  return {
+    abstract: String(details.abstract || ""),
+    authors,
+    authorsText,
+  };
 }
 
 function coercePapers(rawPapers, conference, sessions) {
@@ -624,6 +637,15 @@ function normalizeTrackLabel(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeBadgeCompareLabel(value) {
+  const normalized = normalizeTrackLabel(value).toLowerCase();
+  if (!normalized) return "";
+  return normalized
+    .split(" ")
+    .map((token) => BADGE_ALIAS_MAP.get(token) || token)
+    .join(" ");
 }
 
 function includesAnyKeyword(text, keywords) {
@@ -763,33 +785,14 @@ function makeSelectOption(value, label) {
 function renderAll() {
   if (!state.data) return;
   renderTabs();
-  renderProgramControlsVisibility();
   renderCustomEventForm();
   renderDayBoards();
   renderPlanner();
 }
 
-function renderProgramControlsVisibility() {
-  if (!el.toggleControlsBtn) return;
-  const isVisible = !!state.showProgramControls;
-  if (el.programControlsWrap) {
-    el.programControlsWrap.classList.toggle("hidden", !isVisible);
-  }
-  if (el.calendarControlsWrap) {
-    el.calendarControlsWrap.classList.toggle("hidden", !isVisible);
-  }
-  if (el.programTabPanel) {
-    el.programTabPanel.classList.toggle("controls-collapsed", !isVisible);
-  }
-  el.toggleControlsBtn.textContent = isVisible ? "Hide Controls" : "Show Controls";
-  el.toggleControlsBtn.setAttribute("aria-expanded", String(isVisible));
-  requestAnimationFrame(updateProgramViewportHeight);
-}
-
 function setActiveTab(tab) {
   state.activeTab = tab === "calendar" ? "calendar" : "program";
   renderTabs();
-  requestAnimationFrame(updateProgramViewportHeight);
 }
 
 function renderTabs() {
@@ -800,19 +803,6 @@ function renderTabs() {
   el.calendarTabBtn.setAttribute("aria-selected", String(!isProgram));
   el.programTabPanel.classList.toggle("hidden", !isProgram);
   el.calendarTabPanel.classList.toggle("hidden", isProgram);
-}
-
-function updateProgramViewportHeight() {
-  if (!el.programTabPanel || !el.dayBoards) return;
-  if (el.programTabPanel.classList.contains("hidden")) return;
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-  const dayBoardsRect = el.dayBoards.getBoundingClientRect();
-  const bottomGap = 20;
-  const minHeight = 220;
-  const available = Math.floor(viewportHeight - dayBoardsRect.top - bottomGap);
-  if (!Number.isFinite(available) || available <= 0) return;
-  const maxHeight = Math.max(minHeight, available);
-  el.programTabPanel.style.setProperty("--dayboards-max-height", `${maxHeight}px`);
 }
 
 function renderDayBoards() {
@@ -885,7 +875,9 @@ function renderDayBoard(day, sessions) {
           if (allExpanded) {
             for (const session of expandableSessions) state.expandedSessionIds.delete(session.id);
           } else {
-            for (const session of expandableSessions) state.expandedSessionIds.add(session.id);
+            for (const session of expandableSessions) {
+              state.expandedSessionIds.add(session.id);
+            }
           }
           renderDayBoards();
         });
@@ -913,17 +905,41 @@ function isSessionPaperExpandable(session) {
 }
 
 function hasSessionDetailsContent(session) {
-  const summary = String(session?.subtitle || "").trim();
-  const sourceUrl = String(session?.sourceUrl || "").trim();
-  return Boolean(summary || sourceUrl);
+  const summary = getSessionDetailsText(session);
+  const authors = getSessionDetailsAuthors(session);
+  const subtitle = String(session?.subtitle || "").trim();
+  return Boolean(summary || authors || subtitle);
 }
 
 function canExpandSessionCard(session) {
-  return isSessionPaperExpandable(session);
+  return isSessionPaperExpandable(session) || isSessionDetailsExpandable(session);
 }
 
-function getSessionDetailsSummary(session) {
+function getSessionDetailsText(session) {
+  return String(session?.details?.abstract || "").trim();
+}
+
+function getSessionDetailsAuthors(session) {
+  const authorsText = String(session?.details?.authorsText || "").trim();
+  if (authorsText) return authorsText;
+  if (Array.isArray(session?.details?.authors)) {
+    return session.details.authors
+      .map((name) => String(name || "").trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
+}
+
+function getSessionDescriptionForPlan(session) {
+  const details = getSessionDetailsText(session);
+  if (details) return details;
   return String(session?.subtitle || "").trim();
+}
+
+function isSessionDetailsExpandable(session) {
+  if (!session || isSessionPaperExpandable(session)) return false;
+  return hasSessionDetailsContent(session);
 }
 
 function toggleSessionExpanded(sessionId) {
@@ -934,9 +950,10 @@ function toggleSessionExpanded(sessionId) {
 function shouldShowSessionTrackBadge(session) {
   const track = normalizeTrackLabel(session?.track);
   if (!track) return false;
-  const trackLower = track.toLowerCase();
+  const trackCompare = normalizeBadgeCompareLabel(track);
   const kindLabel = normalizeTrackLabel(KIND_LABEL[session?.kind] || session?.kind);
-  if (kindLabel && trackLower === kindLabel.toLowerCase()) return false;
+  const kindCompare = normalizeBadgeCompareLabel(kindLabel);
+  if (kindCompare && trackCompare === kindCompare) return false;
   if (session?.kind === "technical" && isGenericPaperTrack(track)) return false;
   return true;
 }
@@ -946,7 +963,8 @@ function renderSessionCard(session, visiblePapers) {
   card.className = "session-card";
   const shownPapers = Array.isArray(visiblePapers) ? visiblePapers : [];
   const isPaperSession = isSessionPaperExpandable(session);
-  const hasInlineDetails = String(session?.kind || "").toLowerCase() !== "technical" && hasSessionDetailsContent(session);
+  const isDetailsSession = isSessionDetailsExpandable(session);
+  const hasSourceLink = Boolean(String(session?.sourceUrl || "").trim());
   const isExpanded = state.expandedSessionIds.has(session.id);
 
   const head = document.createElement("div");
@@ -1007,6 +1025,33 @@ function renderSessionCard(session, visiblePapers) {
       renderDayBoards();
     });
     actions.appendChild(expandBtn);
+  } else if (isDetailsSession) {
+    const expandBtn = document.createElement("button");
+    expandBtn.className = "expand-btn";
+    expandBtn.textContent = isExpanded ? "Hide Details" : "Show Details";
+    expandBtn.addEventListener("click", () => {
+      toggleSessionExpanded(session.id);
+      renderDayBoards();
+    });
+    actions.appendChild(expandBtn);
+  } else if (hasSourceLink) {
+    const sourceAction = document.createElement("a");
+    sourceAction.className = "session-details-link";
+    sourceAction.href = session.sourceUrl;
+    sourceAction.target = "_blank";
+    sourceAction.rel = "noreferrer";
+    sourceAction.textContent = "Open Session Source";
+    actions.appendChild(sourceAction);
+  }
+
+  if (!isPaperSession && isDetailsSession && hasSourceLink) {
+    const sourceAction = document.createElement("a");
+    sourceAction.className = "session-details-link";
+    sourceAction.href = session.sourceUrl;
+    sourceAction.target = "_blank";
+    sourceAction.rel = "noreferrer";
+    sourceAction.textContent = "Open Session Source";
+    actions.appendChild(sourceAction);
   }
 
   head.appendChild(actions);
@@ -1027,24 +1072,22 @@ function renderSessionCard(session, visiblePapers) {
       body.appendChild(createEmpty("No papers in this session match the current search/filter."));
     }
     card.appendChild(body);
-  } else if (hasInlineDetails) {
+  } else if (isDetailsSession) {
     const body = document.createElement("div");
-    body.className = "session-body";
-    const detailsSummary = getSessionDetailsSummary(session);
+    body.className = `session-body ${isExpanded ? "" : "hidden"}`.trim();
+    const detailsSummary = getSessionDetailsText(session) || String(session?.subtitle || "").trim();
+    const detailsAuthors = getSessionDetailsAuthors(session);
     if (detailsSummary) {
       const detailsText = document.createElement("p");
       detailsText.className = "session-details-text";
       detailsText.textContent = detailsSummary;
       body.appendChild(detailsText);
     }
-    if (session.sourceUrl) {
-      const sourceLink = document.createElement("a");
-      sourceLink.className = "session-details-link";
-      sourceLink.href = session.sourceUrl;
-      sourceLink.target = "_blank";
-      sourceLink.rel = "noreferrer";
-      sourceLink.textContent = "Open Session Source";
-      body.appendChild(sourceLink);
+    if (detailsAuthors) {
+      const authorsText = document.createElement("p");
+      authorsText.className = "session-details-text";
+      authorsText.textContent = detailsAuthors;
+      body.appendChild(authorsText);
     }
     card.appendChild(body);
   }
@@ -1502,8 +1545,16 @@ function renderEventDetails(items) {
   if (active.entityType === "custom" && active.description) list.appendChild(detailRow("Notes", active.description));
   if (active.entityType === "paper") {
     list.appendChild(detailRow("Session", active.sessionTitle || session?.title || "Session"));
-  } else if (session?.subtitle) {
-    list.appendChild(detailRow("Session Detail", session.subtitle));
+  } else {
+    const summary = getSessionDescriptionForPlan(session);
+    if (summary) list.appendChild(detailRow("Session Detail", summary));
+    const authors = getSessionDetailsAuthors(session);
+    if (authors) {
+      const authorsText = document.createElement("p");
+      authorsText.className = "details-row";
+      authorsText.textContent = authors;
+      list.appendChild(authorsText);
+    }
   }
 
   const decisionGroup = document.createElement("div");
@@ -1553,7 +1604,7 @@ function renderEventDetails(items) {
     detailsLinkBtn.href = active.detailsUrl;
     detailsLinkBtn.target = "_blank";
     detailsLinkBtn.rel = "noreferrer";
-    detailsLinkBtn.textContent = active.entityType === "paper" ? "Open Paper Details" : "Open Session Details";
+    detailsLinkBtn.textContent = active.entityType === "paper" ? "Open Paper Details" : "Open Session Source";
     linkRow.appendChild(detailsLinkBtn);
   }
 
@@ -1563,7 +1614,7 @@ function renderEventDetails(items) {
   abstractTitle.className = "details-row";
   abstractTitle.innerHTML = "<strong>Abstracts</strong>";
   const abstract = document.createElement("p");
-  abstract.textContent = paper?.abstract || active.description || session?.subtitle || "No additional details.";
+  abstract.textContent = paper?.abstract || active.description || getSessionDescriptionForPlan(session) || "No additional details.";
   abstractWrap.append(abstractTitle, abstract);
 
   const noteWrap = document.createElement("div");
@@ -1751,7 +1802,7 @@ function buildPlanItems() {
       end: session.end,
       detailsUrl: session.sourceUrl || "",
       paperUrl: "",
-      description: session.subtitle || "",
+      description: getSessionDescriptionForPlan(session),
       userNote: getEventNote(`session:${session.id}`),
       dayId: session.dayId,
     });

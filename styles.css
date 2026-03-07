@@ -206,11 +206,7 @@ select:focus {
 }
 
 .view-switcher {
-  display: grid;
-  width: 100%;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 0.72rem;
+  display: block;
 }
 
 .view-tabs {
@@ -221,24 +217,6 @@ select:focus {
   border-radius: 12px;
   overflow: hidden;
   background: #eef5ef;
-}
-
-.tabs-controls-toggle {
-  justify-self: end;
-  flex: 0 0 auto;
-  white-space: nowrap;
-  padding: 0.42rem 0.7rem;
-  border-style: dashed;
-}
-
-@media (max-width: 760px) {
-  .view-switcher {
-    grid-template-columns: 1fr;
-  }
-
-  .tabs-controls-toggle {
-    justify-self: start;
-  }
 }
 
 .tab-btn {
@@ -269,18 +247,6 @@ select:focus {
   border: 1px solid #e2eade;
   border-radius: 20px;
   box-shadow: var(--shadow);
-}
-
-.explorer {
-  --dayboards-max-height: calc(100vh - 340px);
-}
-
-.explorer.controls-collapsed {
-  --dayboards-max-height: calc(100vh - 180px);
-}
-
-.explorer.controls-collapsed #programPanelHead {
-  display: none;
 }
 
 .panel-head {
@@ -392,8 +358,6 @@ select:focus {
 }
 
 .day-boards {
-  max-height: var(--dayboards-max-height);
-  overflow: auto;
   padding: 0.8rem 0.85rem 1rem;
   display: grid;
   gap: 0.95rem;
@@ -1085,10 +1049,6 @@ select:focus {
 }
 
 @media (max-width: 980px) {
-  .day-boards {
-    max-height: none;
-  }
-
   .review-layout {
     grid-template-columns: 1fr;
   }

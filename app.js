@@ -1044,16 +1044,6 @@ function renderSessionCard(session, visiblePapers) {
     actions.appendChild(sourceAction);
   }
 
-  if (!isPaperSession && isDetailsSession && hasSourceLink) {
-    const sourceAction = document.createElement("a");
-    sourceAction.className = "session-details-link";
-    sourceAction.href = session.sourceUrl;
-    sourceAction.target = "_blank";
-    sourceAction.rel = "noreferrer";
-    sourceAction.textContent = "Open Session Source";
-    actions.appendChild(sourceAction);
-  }
-
   head.appendChild(actions);
   card.appendChild(head);
 
@@ -1088,6 +1078,15 @@ function renderSessionCard(session, visiblePapers) {
       authorsText.className = "session-details-text";
       authorsText.textContent = detailsAuthors;
       body.appendChild(authorsText);
+    }
+    if (hasSourceLink) {
+      const sourceLink = document.createElement("a");
+      sourceLink.className = "session-details-link";
+      sourceLink.href = session.sourceUrl;
+      sourceLink.target = "_blank";
+      sourceLink.rel = "noreferrer";
+      sourceLink.textContent = "Open Session Source";
+      body.appendChild(sourceLink);
     }
     card.appendChild(body);
   }

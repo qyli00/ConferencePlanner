@@ -446,6 +446,7 @@ function coerceDataset(input, fallbackConferenceId) {
   const papers = coercePapers(input.papers, conference, sessions);
   hydrateSessionPaperIds(sessions, papers);
   normalizeSessionKinds(conference, sessions, papers);
+  const paperCount = countPapersInPaperSessions(sessions, papers);
   const days = coerceDays(input.days, sessions);
 
   return {
@@ -458,12 +459,25 @@ function coerceDataset(input, fallbackConferenceId) {
     stats: {
       dayCount: days.length,
       sessionCount: sessions.length,
-      paperCount: papers.length,
+      paperCount,
       technicalSessionCount: sessions.filter((session) => session.kind === "technical").length,
       workshopCount: sessions.filter((session) => session.kind === "workshop").length,
     },
     ui: input.ui && typeof input.ui === "object" ? input.ui : {},
   };
+}
+
+function countPapersInPaperSessions(sessions, papers) {
+  const validPaperIds = new Set(papers.map((paper) => paper.id));
+  const paperIds = new Set();
+  for (const session of sessions) {
+    if (session?.kind !== "technical") continue;
+    for (const paperId of session.paperIds || []) {
+      if (!validPaperIds.has(paperId)) continue;
+      paperIds.add(paperId);
+    }
+  }
+  return paperIds.size;
 }
 
 function coerceConference(rawConference, source) {
@@ -986,7 +1000,7 @@ function renderSessionCard(session, visiblePapers) {
   badges.innerHTML = [
     badgeHtml(kindLabel),
     shouldShowSessionTrackBadge(session) ? badgeHtml(session.track) : "",
-    totalPapers ? badgeHtml(paperBadge) : "",
+    isPaperSession && totalPapers ? badgeHtml(paperBadge) : "",
   ].join("");
 
   const title = document.createElement("h4");

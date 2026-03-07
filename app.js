@@ -505,7 +505,7 @@ function coerceSessions(rawSessions, conference) {
       start: String(raw.start || ""),
       end: String(raw.end || ""),
       location: String(raw.location || "TBD"),
-      sourceUrl: String(raw.sourceUrl || conference.sourceUrl || ""),
+      sourceUrl: String(raw.sourceUrl || ""),
       paperIds: Array.isArray(raw.paperIds) ? raw.paperIds.map((idValue) => String(idValue)) : [],
       priority: normalizeLevel(raw.priority || "none"),
     });
@@ -912,16 +912,18 @@ function isSessionPaperExpandable(session) {
   return session?.kind === "technical" && (session.paperIds || []).length > 0;
 }
 
-function shouldShowSessionDetailsToggle(session) {
-  return String(session?.kind || "").toLowerCase() !== "technical";
+function hasSessionDetailsContent(session) {
+  const summary = String(session?.subtitle || "").trim();
+  const sourceUrl = String(session?.sourceUrl || "").trim();
+  return Boolean(summary || sourceUrl);
 }
 
 function canExpandSessionCard(session) {
-  return isSessionPaperExpandable(session) || shouldShowSessionDetailsToggle(session);
+  return isSessionPaperExpandable(session);
 }
 
 function getSessionDetailsSummary(session) {
-  return String(session?.subtitle || "").trim() || "No additional details for this session.";
+  return String(session?.subtitle || "").trim();
 }
 
 function toggleSessionExpanded(sessionId) {
@@ -944,7 +946,7 @@ function renderSessionCard(session, visiblePapers) {
   card.className = "session-card";
   const shownPapers = Array.isArray(visiblePapers) ? visiblePapers : [];
   const isPaperSession = isSessionPaperExpandable(session);
-  const hasDetailsToggle = shouldShowSessionDetailsToggle(session);
+  const hasInlineDetails = String(session?.kind || "").toLowerCase() !== "technical" && hasSessionDetailsContent(session);
   const isExpanded = state.expandedSessionIds.has(session.id);
 
   const head = document.createElement("div");
@@ -996,10 +998,10 @@ function renderSessionCard(session, visiblePapers) {
     })
   );
 
-  if (isPaperSession || hasDetailsToggle) {
+  if (isPaperSession) {
     const expandBtn = document.createElement("button");
     expandBtn.className = "expand-btn";
-    expandBtn.textContent = isPaperSession ? (isExpanded ? "Hide Papers" : "Show Papers") : isExpanded ? "Hide Details" : "Show Details";
+    expandBtn.textContent = isExpanded ? "Hide Papers" : "Show Papers";
     expandBtn.addEventListener("click", () => {
       toggleSessionExpanded(session.id);
       renderDayBoards();
@@ -1010,38 +1012,39 @@ function renderSessionCard(session, visiblePapers) {
   head.appendChild(actions);
   card.appendChild(head);
 
-  if (isPaperSession || hasDetailsToggle) {
+  if (isPaperSession) {
     const body = document.createElement("div");
     body.className = `session-body ${isExpanded ? "" : "hidden"}`.trim();
-    if (isPaperSession) {
-      const papersLabel = document.createElement("p");
-      papersLabel.className = "papers-label";
-      papersLabel.textContent = "Papers";
-      body.appendChild(papersLabel);
+    const papersLabel = document.createElement("p");
+    papersLabel.className = "papers-label";
+    papersLabel.textContent = "Papers";
+    body.appendChild(papersLabel);
 
-      for (const paper of shownPapers) {
-        body.appendChild(renderPaperCard(paper, session));
-      }
-      if (!shownPapers.length) {
-        body.appendChild(createEmpty("No papers in this session match the current search/filter."));
-      }
-    } else {
-      const detailsLabel = document.createElement("p");
-      detailsLabel.className = "papers-label";
-      detailsLabel.textContent = "Details";
+    for (const paper of shownPapers) {
+      body.appendChild(renderPaperCard(paper, session));
+    }
+    if (!shownPapers.length) {
+      body.appendChild(createEmpty("No papers in this session match the current search/filter."));
+    }
+    card.appendChild(body);
+  } else if (hasInlineDetails) {
+    const body = document.createElement("div");
+    body.className = "session-body";
+    const detailsSummary = getSessionDetailsSummary(session);
+    if (detailsSummary) {
       const detailsText = document.createElement("p");
       detailsText.className = "session-details-text";
-      detailsText.textContent = getSessionDetailsSummary(session);
-      body.append(detailsLabel, detailsText);
-      if (session.sourceUrl) {
-        const sourceLink = document.createElement("a");
-        sourceLink.className = "session-details-link";
-        sourceLink.href = session.sourceUrl;
-        sourceLink.target = "_blank";
-        sourceLink.rel = "noreferrer";
-        sourceLink.textContent = "Open Session Source";
-        body.appendChild(sourceLink);
-      }
+      detailsText.textContent = detailsSummary;
+      body.appendChild(detailsText);
+    }
+    if (session.sourceUrl) {
+      const sourceLink = document.createElement("a");
+      sourceLink.className = "session-details-link";
+      sourceLink.href = session.sourceUrl;
+      sourceLink.target = "_blank";
+      sourceLink.rel = "noreferrer";
+      sourceLink.textContent = "Open Session Source";
+      body.appendChild(sourceLink);
     }
     card.appendChild(body);
   }
@@ -1161,8 +1164,7 @@ function getVisibleSessions() {
       if (state.filters.priority === "must_go" && sessionLevel !== "must_go" && !hasMustPaper) return false;
 
       if (!q) return true;
-      const sessionText = `${session.title} ${session.subtitle || ""} ${session.track || ""} ${session.location || ""}`.toLowerCase();
-      if (sessionText.includes(q)) return true;
+      if (sessionMatchesQuery(session, q)) return true;
       return papers.some((paper) => paperMatchesQuery(paper, q));
     })
     .sort(sortByStartThenTitle);
@@ -1173,7 +1175,10 @@ function getVisiblePapersForSession(session) {
   let result = papers;
 
   if (state.filters.search) {
-    result = result.filter((paper) => paperMatchesQuery(paper, state.filters.search));
+    // If the session itself matches, keep all papers visible for context.
+    if (!sessionMatchesQuery(session, state.filters.search)) {
+      result = result.filter((paper) => paperMatchesQuery(paper, state.filters.search));
+    }
   }
   if (state.filters.priority === "selected") {
     result = result.filter((paper) => getPaperLevel(paper.id) !== "none");
@@ -1185,6 +1190,10 @@ function getVisiblePapersForSession(session) {
 
 function paperMatchesQuery(paper, query) {
   return `${paper.title} ${paper.authorsText || ""} ${paper.abstract || ""}`.toLowerCase().includes(query);
+}
+
+function sessionMatchesQuery(session, query) {
+  return `${session.title} ${session.subtitle || ""} ${session.track || ""} ${session.location || ""}`.toLowerCase().includes(query);
 }
 
 function getSessionTagValues(session, papers = []) {

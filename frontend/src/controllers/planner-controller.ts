@@ -1,3 +1,7 @@
+// @ts-nocheck
+import { createShareController } from "./share-controller";
+import { normalizeLocalDateTimeText, normalizeSharedEventDateTime, resolveConferenceTimeZone } from "./time-utils";
+
 const PROFILE_VERSION = 5;
 const PAPER_SLOT_MINUTES = 20;
 const DEFAULT_MAX_PARALLEL_PER_ROW = 4;
@@ -5,16 +9,16 @@ const CONFERENCE_REGISTRY = {
   "ndss-2026": {
     id: "ndss-2026",
     label: "NDSS 2026",
-    dataUrl: "./data/ndss2026/ndss-2026.json",
+    dataUrl: "/api/datasets/ndss-2026",
     loadHint:
-      "python3 scripts/crawl_ndss_2026.py --raw-output data/ndss2026/raw/program.html --json-output data/ndss2026/ndss-2026.json",
+      "python3 backend/scripts/crawl_ndss_2026.py --raw-output backend/data/ndss2026/raw/program.html --json-output backend/data/ndss2026/ndss-2026.json",
   },
   "chi-2026": {
     id: "chi-2026",
     label: "CHI 2026",
-    dataUrl: "./data/chi2026/chi-2026.json",
+    dataUrl: "/api/datasets/chi-2026",
     loadHint:
-      "python3 scripts/crawl_chi_2026.py --raw-output data/chi2026/raw/program.html --json-output data/chi2026/chi-2026.json",
+      "python3 backend/scripts/crawl_chi_2026.py --raw-output backend/data/chi2026/raw/program.html --json-output backend/data/chi2026/chi-2026.json",
   },
 };
 const DEFAULT_CONFERENCE_ID = "chi-2026";
@@ -79,6 +83,55 @@ const KIND_KEYWORDS = {
   journal: ["journal"],
   technical: ["paper", "papers"],
 };
+const SHARE_ELEMENT_KEYS = [
+  "shareScheduleBtn",
+  "shareComposerModal",
+  "closeShareComposerBtn",
+  "shareNameInput",
+  "shareExpiryMode",
+  "shareExpiryCustomWrap",
+  "shareExpiryCustomInput",
+  "shareIncludeNotes",
+  "shareMaskLocation",
+  "shareMaskSession",
+  "shareMaskDescription",
+  "shareMaskLinks",
+  "shareIncludeAllBtn",
+  "shareExcludeAllBtn",
+  "shareComposerStatus",
+  "shareCalendarWrap",
+  "shareEventEditorWrap",
+  "publishShareBtn",
+  "shareResultWrap",
+  "closeShareResultBtn",
+  "shareUrlOutput",
+  "copyShareLinkBtn",
+  "shareOnXBtn",
+  "shareOnFacebookBtn",
+  "shareOnLinkedInBtn",
+  "shareOnBlueskyBtn",
+  "shareExpiryText",
+];
+const SHARED_IMPORT_ELEMENT_KEYS = [
+  "sharedImportModal",
+  "sharedImportTitle",
+  "closeSharedImportBtn",
+  "sharedImportStatus",
+  "sharedImportSummary",
+  "sharedImportPreview",
+  "sharedImportLoadAllBtn",
+  "sharedImportChooseBtn",
+  "sharedImportCancelBtn",
+  "sharedImportSelectionWrap",
+  "sharedImportSelectAllBtn",
+  "sharedImportSelectNoneBtn",
+  "sharedImportList",
+  "sharedImportApplyBtn",
+];
+const OPTIONAL_ELEMENT_KEYS = new Set(["conferenceSelect", ...SHARE_ELEMENT_KEYS, ...SHARED_IMPORT_ELEMENT_KEYS]);
+const SHARE_PATH_RE = /^\/s\/([A-Za-z0-9_-]{8,40})\/?$/;
+
+let shareController = null;
 
 const state = {
   activeConferenceId: DEFAULT_CONFERENCE_ID,
@@ -106,91 +159,747 @@ const state = {
   activeCalendarItemId: "",
   activeTab: "program",
   profileStorageKey: "",
+  share: null,
+  sharedImport: null,
+  suspendProfilePersistence: false,
 };
 
-const el = {
-  searchInput: document.getElementById("searchInput"),
-  dayFilter: document.getElementById("dayFilter"),
-  kindFilter: document.getElementById("kindFilter"),
-  sessionTagFilter: document.getElementById("sessionTagFilter"),
-  priorityFilter: document.getElementById("priorityFilter"),
-  conferenceSelect: document.getElementById("conferenceSelect"),
-  backToLandingBtn: document.getElementById("backToLandingBtn"),
-  programTabBtn: document.getElementById("programTabBtn"),
-  calendarTabBtn: document.getElementById("calendarTabBtn"),
-  programTabPanel: document.getElementById("programTabPanel"),
-  calendarTabPanel: document.getElementById("calendarTabPanel"),
-  explorerActions: document.getElementById("explorerActions"),
-  programFilters: document.getElementById("programFilters"),
-  expandAllBtn: document.getElementById("expandAllBtn"),
-  collapseAllBtn: document.getElementById("collapseAllBtn"),
-  resetSelectionsBtn: document.getElementById("resetSelectionsBtn"),
-  saveProfileBtn: document.getElementById("saveProfileBtn"),
-  loadProfileInput: document.getElementById("loadProfileInput"),
-  addCustomEventBtn: document.getElementById("addCustomEventBtn"),
-  customEventFormWrap: document.getElementById("customEventFormWrap"),
-  customTitle: document.getElementById("customTitle"),
-  customDate: document.getElementById("customDate"),
-  customStartTime: document.getElementById("customStartTime"),
-  customEndTime: document.getElementById("customEndTime"),
-  customPriority: document.getElementById("customPriority"),
-  customLocation: document.getElementById("customLocation"),
-  customNotes: document.getElementById("customNotes"),
-  saveCustomEventBtn: document.getElementById("saveCustomEventBtn"),
-  cancelCustomEventBtn: document.getElementById("cancelCustomEventBtn"),
-  confirmUndecidedBtn: document.getElementById("confirmUndecidedBtn"),
-  removeUndecidedBtn: document.getElementById("removeUndecidedBtn"),
-  exportIcsBtn: document.getElementById("exportIcsBtn"),
-  statusMessage: document.getElementById("statusMessage"),
-  explorerStats: document.getElementById("explorerStats"),
-  plannerStats: document.getElementById("plannerStats"),
-  dayBoards: document.getElementById("dayBoards"),
-  weekCalendar: document.getElementById("weekCalendar"),
-  eventDetails: document.getElementById("eventDetails"),
-  conferenceEyebrow: document.getElementById("conferenceEyebrow"),
-  conferenceTitle: document.getElementById("conferenceTitle"),
-  conferenceSubtitle: document.getElementById("conferenceSubtitle"),
-};
+const el = {};
 
-init();
+function resolveElements() {
+  Object.assign(el, {
+    searchInput: document.getElementById("searchInput"),
+    dayFilter: document.getElementById("dayFilter"),
+    kindFilter: document.getElementById("kindFilter"),
+    sessionTagFilter: document.getElementById("sessionTagFilter"),
+    priorityFilter: document.getElementById("priorityFilter"),
+    conferenceSelect: document.getElementById("conferenceSelect"),
+    backToLandingBtn: document.getElementById("backToLandingBtn"),
+    programTabBtn: document.getElementById("programTabBtn"),
+    calendarTabBtn: document.getElementById("calendarTabBtn"),
+    programTabPanel: document.getElementById("programTabPanel"),
+    calendarTabPanel: document.getElementById("calendarTabPanel"),
+    explorerActions: document.getElementById("explorerActions"),
+    programFilters: document.getElementById("programFilters"),
+    expandAllBtn: document.getElementById("expandAllBtn"),
+    collapseAllBtn: document.getElementById("collapseAllBtn"),
+    resetSelectionsBtn: document.getElementById("resetSelectionsBtn"),
+    saveProfileBtn: document.getElementById("saveProfileBtn"),
+    loadProfileInput: document.getElementById("loadProfileInput"),
+    addCustomEventBtn: document.getElementById("addCustomEventBtn"),
+    customEventFormWrap: document.getElementById("customEventFormWrap"),
+    customTitle: document.getElementById("customTitle"),
+    customDate: document.getElementById("customDate"),
+    customStartTime: document.getElementById("customStartTime"),
+    customEndTime: document.getElementById("customEndTime"),
+    customPriority: document.getElementById("customPriority"),
+    customLocation: document.getElementById("customLocation"),
+    customNotes: document.getElementById("customNotes"),
+    saveCustomEventBtn: document.getElementById("saveCustomEventBtn"),
+    cancelCustomEventBtn: document.getElementById("cancelCustomEventBtn"),
+    confirmUndecidedBtn: document.getElementById("confirmUndecidedBtn"),
+    removeUndecidedBtn: document.getElementById("removeUndecidedBtn"),
+    shareScheduleBtn: document.getElementById("shareScheduleBtn"),
+    shareComposerModal: document.getElementById("shareComposerModal"),
+    closeShareComposerBtn: document.getElementById("closeShareComposerBtn"),
+    shareNameInput: document.getElementById("shareNameInput"),
+    shareExpiryMode: document.getElementById("shareExpiryMode"),
+    shareExpiryCustomWrap: document.getElementById("shareExpiryCustomWrap"),
+    shareExpiryCustomInput: document.getElementById("shareExpiryCustomInput"),
+    shareIncludeNotes: document.getElementById("shareIncludeNotes"),
+    shareMaskLocation: document.getElementById("shareMaskLocation"),
+    shareMaskSession: document.getElementById("shareMaskSession"),
+    shareMaskDescription: document.getElementById("shareMaskDescription"),
+    shareMaskLinks: document.getElementById("shareMaskLinks"),
+    shareIncludeAllBtn: document.getElementById("shareIncludeAllBtn"),
+    shareExcludeAllBtn: document.getElementById("shareExcludeAllBtn"),
+    shareComposerStatus: document.getElementById("shareComposerStatus"),
+    shareCalendarWrap: document.getElementById("shareCalendarWrap"),
+    shareEventEditorWrap: document.getElementById("shareEventEditorWrap"),
+    publishShareBtn: document.getElementById("publishShareBtn"),
+    shareResultWrap: document.getElementById("shareResultWrap"),
+    closeShareResultBtn: document.getElementById("closeShareResultBtn"),
+    shareUrlOutput: document.getElementById("shareUrlOutput"),
+    copyShareLinkBtn: document.getElementById("copyShareLinkBtn"),
+    shareOnXBtn: document.getElementById("shareOnXBtn"),
+    shareOnFacebookBtn: document.getElementById("shareOnFacebookBtn"),
+    shareOnLinkedInBtn: document.getElementById("shareOnLinkedInBtn"),
+    shareOnBlueskyBtn: document.getElementById("shareOnBlueskyBtn"),
+    shareExpiryText: document.getElementById("shareExpiryText"),
+    sharedImportModal: document.getElementById("sharedImportModal"),
+    sharedImportTitle: document.getElementById("sharedImportTitle"),
+    closeSharedImportBtn: document.getElementById("closeSharedImportBtn"),
+    sharedImportStatus: document.getElementById("sharedImportStatus"),
+    sharedImportSummary: document.getElementById("sharedImportSummary"),
+    sharedImportPreview: document.getElementById("sharedImportPreview"),
+    sharedImportLoadAllBtn: document.getElementById("sharedImportLoadAllBtn"),
+    sharedImportChooseBtn: document.getElementById("sharedImportChooseBtn"),
+    sharedImportCancelBtn: document.getElementById("sharedImportCancelBtn"),
+    sharedImportSelectionWrap: document.getElementById("sharedImportSelectionWrap"),
+    sharedImportSelectAllBtn: document.getElementById("sharedImportSelectAllBtn"),
+    sharedImportSelectNoneBtn: document.getElementById("sharedImportSelectNoneBtn"),
+    sharedImportList: document.getElementById("sharedImportList"),
+    sharedImportApplyBtn: document.getElementById("sharedImportApplyBtn"),
+    exportIcsBtn: document.getElementById("exportIcsBtn"),
+    statusMessage: document.getElementById("statusMessage"),
+    explorerStats: document.getElementById("explorerStats"),
+    plannerStats: document.getElementById("plannerStats"),
+    dayBoards: document.getElementById("dayBoards"),
+    weekCalendar: document.getElementById("weekCalendar"),
+    eventDetails: document.getElementById("eventDetails"),
+    conferenceEyebrow: document.getElementById("conferenceEyebrow"),
+    conferenceTitle: document.getElementById("conferenceTitle"),
+    conferenceSubtitle: document.getElementById("conferenceSubtitle"),
+  });
+}
+
+function assertRequiredElements() {
+  const missing = Object.entries(el)
+    .filter(([key, value]) => !OPTIONAL_ELEMENT_KEYS.has(key) && !value)
+    .map(([key]) => key);
+  if (missing.length) {
+    throw new Error(`Planner DOM not ready: missing ${missing.join(", ")}`);
+  }
+}
+
+function hasShareElements() {
+  return SHARE_ELEMENT_KEYS.every((key) => Boolean(el[key]));
+}
+
+function isSharedReadOnlyMode() {
+  return false;
+}
+
+let initialized = false;
+
+export function initPlannerApp() {
+  if (initialized) return;
+  initialized = true;
+  init().catch((error) => {
+    setStatus(`Planner initialization failed: ${error.message}`, true);
+  });
+}
 
 async function init() {
+  resolveElements();
+  assertRequiredElements();
+  if (hasShareElements()) {
+    shareController = createShareController({
+      state,
+      el,
+      buildPlanItems,
+      setStatus,
+      createEmpty,
+      fmtDay,
+      fmtTime,
+      fmtDateTime,
+      toDatetimeLocal,
+      isoDay,
+    });
+    state.share = shareController.createInitialShareState();
+  } else {
+    shareController = null;
+    state.share = null;
+  }
   bindEvents();
+  if (shareController) shareController.bindEvents();
   renderConferenceSelector();
+  const shareId = getShareIdFromLocation();
+  if (shareId) {
+    try {
+      await loadSharedSchedule(shareId);
+    } catch (error) {
+      await loadConference(getInitialConferenceId(), false);
+      setStatus(error.message || "Failed to load shared schedule.", true);
+    }
+    return;
+  }
   await loadConference(getInitialConferenceId(), false);
+}
+
+function getShareIdFromLocation() {
+  const pathMatch = window.location.pathname.match(SHARE_PATH_RE);
+  if (pathMatch) return pathMatch[1];
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get("share") || "").trim();
+}
+
+async function loadSharedSchedule(shareId) {
+  setStatus("Loading shared schedule...", false);
+
+  const response = await fetch(`/api/shares/${encodeURIComponent(shareId)}`, { cache: "no-store" });
+  if (response.status === 404) {
+    throw new Error("Shared link not found.");
+  }
+  if (response.status === 410) {
+    const body = await response.json().catch(() => ({}));
+    const expiryText = body?.expiresAt ? ` It expired on ${fmtDateTime(body.expiresAt)}.` : "";
+    throw new Error(`Shared link expired.${expiryText}`);
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to load shared schedule (HTTP ${response.status}).`);
+  }
+
+  const payload = await response.json();
+  const sharedConferenceId = resolveConferenceId(String(payload?.conferenceId || DEFAULT_CONFERENCE_ID));
+  state.suspendProfilePersistence = true;
+  try {
+    await loadConference(sharedConferenceId, false);
+  } finally {
+    state.suspendProfilePersistence = false;
+  }
+  const parsedSharedEvents = parseSharedEvents(payload, shareId);
+  const planItems = buildPlanItems();
+  const annotatedSharedEvents = parsedSharedEvents.map((event) => {
+    const conflicts = findSharedConflicts(event, planItems);
+    const duplicate = findSharedDuplicate(event, planItems);
+    let mergeStatus = "clean";
+    if (duplicate) mergeStatus = "duplicate";
+    else if (conflicts.length) mergeStatus = "conflict";
+    return {
+      ...event,
+      include: mergeStatus !== "duplicate",
+      mergeStatus,
+      duplicateOf: duplicate,
+      conflicts,
+    };
+  });
+
+  state.sharedImport = {
+    shareId,
+    shareName: String(payload?.shareName || "").trim(),
+    conferenceId: String(payload?.conferenceId || sharedConferenceId),
+    expiresAt: String(payload?.expiresAt || ""),
+    createdAt: String(payload?.createdAt || ""),
+    events: annotatedSharedEvents,
+    selectMode: false,
+  };
+  // Shared-link entry should land users in Calendar view before merge/import actions.
+  state.activeTab = "calendar";
+  renderTabs();
+  renderSharedImportModal();
+  setStatus(`Shared schedule loaded (${annotatedSharedEvents.length} incoming event(s)).`, false);
+}
+
+function normalizeSharedEntityType(rawType) {
+  const candidate = String(rawType || "").trim().toLowerCase();
+  if (candidate === "paper" || candidate === "session" || candidate === "custom") return candidate;
+  return "custom";
+}
+
+function labelForSharedEntityType(rawType) {
+  const type = normalizeSharedEntityType(rawType);
+  if (type === "paper") return "Shared Paper";
+  if (type === "session") return "Shared Session";
+  return "Custom Event";
+}
+
+function parseSharedEvents(payload, shareId) {
+  const events = Array.isArray(payload?.events) ? payload.events : [];
+  const normalizedEvents = [];
+  const conferenceTimeZone = resolveConferenceTimeZone(
+    payload?.conferenceId || state.data?.conference?.id,
+    payload?.conferenceTimezone || state.data?.conference?.timezone
+  );
+  for (const [index, rawEvent] of events.entries()) {
+    if (!rawEvent || typeof rawEvent !== "object") continue;
+    const start = normalizeSharedEventDateTime(rawEvent.start, conferenceTimeZone);
+    const end = normalizeSharedEventDateTime(rawEvent.end, conferenceTimeZone);
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate.getTime() <= startDate.getTime()) {
+      continue;
+    }
+    const links = rawEvent.links && typeof rawEvent.links === "object" ? rawEvent.links : {};
+    normalizedEvents.push({
+      sharedId: `shared:${shareId}:${index + 1}`,
+      sourceEventId: String(rawEvent.sourceEventId || ""),
+      shareEntityType: normalizeSharedEntityType(rawEvent.entityType),
+      title: String(rawEvent.title || "").trim() || `Shared Event ${index + 1}`,
+      start,
+      end,
+      location: String(rawEvent.location || "").trim(),
+      description: String(rawEvent.description || "").trim(),
+      notes: String(rawEvent.notes || "").trim(),
+      sessionTitle: String(rawEvent.sessionTitle || "").trim(),
+      paperUrl: String(links.paperUrl || "").trim(),
+      detailsUrl: String(links.detailsUrl || "").trim(),
+      importIndex: index,
+    });
+  }
+  return normalizedEvents;
+}
+
+function rangesOverlap(startA, endA, startB, endB) {
+  const a0 = new Date(startA).getTime();
+  const a1 = new Date(endA).getTime();
+  const b0 = new Date(startB).getTime();
+  const b1 = new Date(endB).getTime();
+  if (!Number.isFinite(a0) || !Number.isFinite(a1) || !Number.isFinite(b0) || !Number.isFinite(b1)) return false;
+  return a0 < b1 && b0 < a1;
+}
+
+function rangeEqual(startA, endA, startB, endB) {
+  return new Date(startA).getTime() === new Date(startB).getTime() && new Date(endA).getTime() === new Date(endB).getTime();
+}
+
+function overlapMinutes(startA, endA, startB, endB) {
+  const a0 = new Date(startA).getTime();
+  const a1 = new Date(endA).getTime();
+  const b0 = new Date(startB).getTime();
+  const b1 = new Date(endB).getTime();
+  if (!Number.isFinite(a0) || !Number.isFinite(a1) || !Number.isFinite(b0) || !Number.isFinite(b1)) return 0;
+  const overlap = Math.min(a1, b1) - Math.max(a0, b0);
+  if (overlap <= 0) return 0;
+  return Math.round(overlap / 60000);
+}
+
+function normalizeTitleForMerge(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findSharedDuplicate(sharedEvent, planItems) {
+  const targetTitle = normalizeTitleForMerge(sharedEvent.title);
+  return planItems.find((item) => {
+    if (!rangeEqual(sharedEvent.start, sharedEvent.end, item.start, item.end)) return false;
+    return normalizeTitleForMerge(item.title) === targetTitle;
+  }) || null;
+}
+
+function findSharedConflicts(sharedEvent, planItems) {
+  return planItems
+    .filter((item) => rangesOverlap(sharedEvent.start, sharedEvent.end, item.start, item.end))
+    .map((item) => {
+      const decision = getDecision(item.id);
+      return {
+        id: item.id,
+        title: item.title,
+        start: item.start,
+        end: item.end,
+        location: item.location || "",
+        entityType: item.entityType,
+        decision,
+        decisionLabel: decision ? DECISION_LABEL[decision] : "Undecided",
+      };
+    });
+}
+
+function normalizeSharedLinkUrl() {
+  const url = new URL(window.location.href);
+  const hasSharePath = SHARE_PATH_RE.test(url.pathname);
+  const hasShareParam = url.searchParams.has("share");
+  if (!hasSharePath && !hasShareParam) return;
+  url.pathname = "/planner.html";
+  url.searchParams.delete("share");
+  url.searchParams.set("conference", state.activeConferenceId || DEFAULT_CONFERENCE_ID);
+  window.history.replaceState({}, "", url.toString());
+}
+
+function closeSharedImportModal(normalizeUrl = false) {
+  state.sharedImport = null;
+  if (el.sharedImportModal) el.sharedImportModal.classList.add("hidden");
+  if (normalizeUrl) normalizeSharedLinkUrl();
+}
+
+function renderSharedImportModal() {
+  const sharedImport = state.sharedImport;
+  if (!el.sharedImportModal) return;
+  const isOpen = Boolean(sharedImport);
+  el.sharedImportModal.classList.toggle("hidden", !isOpen);
+  if (!isOpen) return;
+
+  const allEvents = sharedImport.events || [];
+  const conflictCount = allEvents.filter((event) => event.mergeStatus === "conflict").length;
+  const duplicateCount = allEvents.filter((event) => event.mergeStatus === "duplicate").length;
+  const cleanCount = allEvents.filter((event) => event.mergeStatus === "clean").length;
+  const includeCount = allEvents.filter((event) => event.include).length;
+  const shareName = String(sharedImport.shareName || "").trim() || "Shared Schedule";
+  el.sharedImportTitle.textContent = `Merge ${shareName}`;
+  const expiryText = sharedImport.expiresAt ? `Expires ${fmtDateTime(sharedImport.expiresAt)}.` : "";
+  el.sharedImportStatus.textContent = `${allEvents.length} incoming events from "${shareName}". ${expiryText}`.trim();
+  el.sharedImportStatus.style.color = "#3f6050";
+  const recommendationText = conflictCount === 0 && duplicateCount === 0
+    ? "Recommended import: Load Entire Schedule."
+    : "Recommended import: Select Specific Events and review the calendar diff.";
+  el.sharedImportSummary.textContent =
+    `Merge preview: ${cleanCount} clean (no overlap), ${conflictCount} conflict (time overlaps), ${duplicateCount} duplicate (same title + time). ${includeCount} selected for import. ${recommendationText}`;
+
+  renderSharedImportPreview();
+
+  const showSelection = Boolean(sharedImport.selectMode);
+  el.sharedImportSelectionWrap.classList.toggle("hidden", !showSelection);
+  if (showSelection) renderSharedImportList();
+}
+
+function renderSharedImportPreview() {
+  if (!state.sharedImport || !el.sharedImportPreview) return;
+  const allEvents = state.sharedImport.events || [];
+  el.sharedImportPreview.textContent = "";
+  if (!allEvents.length) {
+    el.sharedImportPreview.appendChild(createEmpty("No incoming events available for preview."));
+    return;
+  }
+
+  const title = document.createElement("p");
+  title.className = "shared-import-preview-title";
+  title.textContent = "Calendar Diff Preview";
+  const subtitle = document.createElement("p");
+  subtitle.className = "shared-import-preview-subtitle";
+  subtitle.textContent = "Current calendar vs incoming changes. Unchanged duplicates are not highlighted.";
+  el.sharedImportPreview.append(title, subtitle, buildSharedImportLegend(), buildSharedImportDiffCalendar(false));
+}
+
+function renderSharedImportList() {
+  if (!state.sharedImport) return;
+  el.sharedImportList.textContent = "";
+  const hint = document.createElement("p");
+  hint.className = "shared-import-preview-subtitle";
+  hint.textContent = "Select incoming changes directly in the calendar view.";
+  el.sharedImportList.append(hint, buildSharedImportLegend(), buildSharedImportDiffCalendar(true));
+}
+
+function buildSharedImportLegend() {
+  const legend = document.createElement("div");
+  legend.className = "shared-import-merge-legend";
+  legend.append(
+    makeSharedImportLegendPill("current", "Current"),
+    makeSharedImportLegendPill("incoming-clean", "Incoming (new)"),
+    makeSharedImportLegendPill("incoming-conflict", "Incoming (conflict)"),
+    makeSharedImportLegendPill("incoming-excluded", "Incoming (excluded)")
+  );
+  return legend;
+}
+
+function makeSharedImportLegendPill(kind, text) {
+  const pill = document.createElement("span");
+  pill.className = `shared-import-merge-pill ${kind}`;
+  pill.textContent = text;
+  return pill;
+}
+
+function buildSharedImportDiffCalendar(selectable) {
+  if (!state.sharedImport) return createEmpty("No incoming events.");
+  const model = buildSharedImportDiffModel();
+  if (!model.incoming.length) {
+    return createEmpty("No incoming changes to import. Incoming events match your current calendar.");
+  }
+
+  const days = buildSharedImportDiffDays([...model.current, ...model.incoming]);
+  const bounds = computeCalendarBounds(days, [...model.current, ...model.incoming]);
+  const hourHeight = 56;
+  const pxPerMinute = hourHeight / 60;
+  const totalHeight = (bounds.endHour - bounds.startHour) * hourHeight;
+
+  const shell = document.createElement("div");
+  shell.className = "calendar-shell shared-import-merge-shell";
+
+  const header = document.createElement("div");
+  header.className = "calendar-header";
+  header.style.setProperty("--day-count", String(days.length));
+  const timeHead = document.createElement("div");
+  timeHead.className = "head-cell";
+  timeHead.textContent = "Time";
+  header.appendChild(timeHead);
+  for (const day of days) {
+    const cell = document.createElement("div");
+    cell.className = "head-cell";
+    cell.textContent = day.label;
+    header.appendChild(cell);
+  }
+  shell.appendChild(header);
+
+  const scroll = document.createElement("div");
+  scroll.className = "calendar-scroll";
+  const body = document.createElement("div");
+  body.className = "calendar-body";
+
+  const timeAxis = document.createElement("div");
+  timeAxis.className = "time-axis";
+  timeAxis.style.height = `${totalHeight}px`;
+  for (let hour = bounds.startHour; hour <= bounds.endHour; hour += 1) {
+    const label = document.createElement("p");
+    label.className = "time-label";
+    label.style.top = `${(hour - bounds.startHour) * hourHeight}px`;
+    label.textContent = formatHourLabel(hour);
+    timeAxis.appendChild(label);
+  }
+  body.appendChild(timeAxis);
+
+  const daysGrid = document.createElement("div");
+  daysGrid.className = "days-grid";
+  daysGrid.style.setProperty("--day-count", String(days.length));
+  for (const day of days) {
+    const column = document.createElement("div");
+    column.className = "day-column";
+    column.style.height = `${totalHeight}px`;
+    column.style.setProperty("--hour-height", `${hourHeight}px`);
+
+    const currentItems = model.current.filter((item) => item.dayId === day.id);
+    const incomingItems = model.incoming.filter((item) => item.dayId === day.id);
+    const laidOut = assignDayLanes([...currentItems, ...incomingItems].sort(sortPlanItems));
+
+    for (const item of laidOut) {
+      const startMin = minutesOfDay(item.start);
+      const endMin = Math.max(minutesOfDay(item.end), startMin + 1);
+      const top = (startMin - bounds.startMinute) * pxPerMinute;
+      const height = Math.max((endMin - startMin) * pxPerMinute, 18);
+      const laneWidth = 100 / item.laneCount;
+      const leftPct = item.lane * laneWidth + 1;
+      const widthPct = Math.max(laneWidth - 2, 16);
+
+      const event = document.createElement("div");
+      const incomingStateClass =
+        item.kind === "incoming"
+          ? item.mergeStatus === "conflict"
+            ? "incoming-conflict"
+            : "incoming-clean"
+          : "current";
+      event.className =
+        `calendar-event merge-calendar-event ${incomingStateClass}` +
+        (item.kind === "incoming" && !item.include ? " incoming-excluded" : "") +
+        (selectable && item.kind === "incoming" ? " selectable" : "");
+      event.style.top = `${top}px`;
+      event.style.height = `${height}px`;
+      event.style.left = `${leftPct}%`;
+      event.style.width = `${widthPct}%`;
+      event.title = `${item.title} (${fmtTime(item.start)}-${fmtTime(item.end)})`;
+      if (selectable && item.kind === "incoming") {
+        event.tabIndex = 0;
+        event.setAttribute("role", "button");
+        event.setAttribute("aria-pressed", String(Boolean(item.include)));
+        event.addEventListener("click", () => {
+          item.sharedEvent.include = !item.sharedEvent.include;
+          renderSharedImportModal();
+        });
+        event.addEventListener("keydown", (evt) => {
+          if (evt.key === "Enter" || evt.key === " ") {
+            evt.preventDefault();
+            item.sharedEvent.include = !item.sharedEvent.include;
+            renderSharedImportModal();
+          }
+        });
+      }
+
+      const title = document.createElement("p");
+      title.className = "calendar-event-title";
+      title.textContent = item.title;
+      event.appendChild(title);
+      column.appendChild(event);
+    }
+    daysGrid.appendChild(column);
+  }
+  body.appendChild(daysGrid);
+  scroll.appendChild(body);
+  shell.appendChild(scroll);
+  return shell;
+}
+
+function buildSharedImportDiffModel() {
+  const sharedEvents = state.sharedImport?.events || [];
+  const incoming = [];
+  const relatedCurrentIds = new Set();
+
+  for (const sharedEvent of sharedEvents) {
+    if (sharedEvent.mergeStatus !== "duplicate") {
+      incoming.push({
+        id: `incoming:${sharedEvent.sharedId}`,
+        title: sharedEvent.title,
+        start: sharedEvent.start,
+        end: sharedEvent.end,
+        dayId: resolveSharedImportDayId(sharedEvent.start),
+        kind: "incoming",
+        mergeStatus: sharedEvent.mergeStatus,
+        include: Boolean(sharedEvent.include),
+        sharedEvent,
+      });
+    }
+    if (sharedEvent.duplicateOf?.id) relatedCurrentIds.add(sharedEvent.duplicateOf.id);
+    for (const conflict of sharedEvent.conflicts || []) {
+      if (conflict?.id) relatedCurrentIds.add(conflict.id);
+    }
+  }
+
+  const current = buildPlanItems()
+    .filter((item) => relatedCurrentIds.has(item.id))
+    .map((item) => ({
+      id: `current:${item.id}`,
+      title: item.title,
+      start: item.start,
+      end: item.end,
+      dayId: resolveSharedImportDayId(item.start),
+      kind: "current",
+      mergeStatus: "current",
+      include: true,
+    }));
+
+  return { incoming, current };
+}
+
+function resolveSharedImportDayId(startValue) {
+  const day = isoDay(startValue);
+  return day ? `day-${day}` : "day-unscheduled";
+}
+
+function buildSharedImportDiffDays(items) {
+  const byId = new Map();
+  for (const day of state.data?.days || []) {
+    byId.set(day.id, { id: day.id, label: day.label, date: day.date || day.id.replace(/^day-/, "") });
+  }
+
+  for (const item of items) {
+    const dayId = item.dayId || resolveSharedImportDayId(item.start);
+    if (byId.has(dayId)) continue;
+    if (dayId === "day-unscheduled") {
+      byId.set(dayId, { id: dayId, label: "Unscheduled", date: "9999-12-31" });
+      continue;
+    }
+    const iso = dayId.startsWith("day-") ? dayId.slice("day-".length) : "";
+    byId.set(dayId, { id: dayId, label: fmtDay(iso), date: iso || dayId });
+  }
+
+  return [...byId.values()].sort((a, b) => String(a.date || a.id).localeCompare(String(b.date || b.id)));
+}
+
+function toImportedCustomEvent(sharedEvent, shareId, seed) {
+  return {
+    id: `custom:${slug(`shared-${shareId}-${seed}-${sharedEvent.title}-${Date.now()}`)}`,
+    title: sharedEvent.title,
+    start: sharedEvent.start,
+    end: sharedEvent.end,
+    location: sharedEvent.location,
+    notes: sharedEvent.notes,
+    description: sharedEvent.description,
+    sessionTitle: sharedEvent.sessionTitle,
+    level: "interested",
+    shareEntityType: sharedEvent.shareEntityType,
+    sourceEventId: sharedEvent.sourceEventId,
+    detailsUrl: sharedEvent.detailsUrl,
+    paperUrl: sharedEvent.paperUrl,
+  };
+}
+
+function loadEntireSharedSchedule() {
+  if (!state.sharedImport) return;
+  const importEvents = state.sharedImport.events || [];
+  const imported = importEvents.map((event, index) => toImportedCustomEvent(event, state.sharedImport.shareId, index + 1));
+  state.priorities.sessions = {};
+  state.priorities.papers = {};
+  state.decisions = {};
+  state.eventNotes = {};
+  state.customEvents = imported;
+  state.expandedSessionIds.clear();
+  state.activeTab = "calendar";
+  state.activeCalendarItemId = imported[0]?.id || "";
+  const conflictCount = importEvents.filter((event) => event.mergeStatus === "conflict").length;
+  closeSharedImportModal(true);
+  persistProfile();
+  renderAll();
+  setStatus(`Loaded full shared schedule (${imported.length} events, ${conflictCount} conflict slot(s)).`, false);
+}
+
+function addSelectedSharedEvents() {
+  if (!state.sharedImport) return;
+  const selected = state.sharedImport.events.filter((event) => event.include);
+  if (!selected.length) {
+    el.sharedImportStatus.textContent = "Select at least one event to import.";
+    el.sharedImportStatus.style.color = "#a83f1a";
+    return;
+  }
+  const startCount = state.customEvents.length;
+  const imported = selected.map((event, index) => toImportedCustomEvent(event, state.sharedImport.shareId, startCount + index + 1));
+  state.customEvents.push(...imported);
+  state.activeTab = "calendar";
+  if (!state.activeCalendarItemId && imported.length) {
+    state.activeCalendarItemId = imported[0].id;
+  }
+  const conflictCount = selected.filter((event) => event.mergeStatus === "conflict").length;
+  closeSharedImportModal(true);
+  persistProfile();
+  renderAll();
+  setStatus(`Added ${imported.length} shared event(s) to your calendar (${conflictCount} with time conflicts).`, false);
 }
 
 function bindEvents() {
   el.programTabBtn.addEventListener("click", () => setActiveTab("program"));
   el.calendarTabBtn.addEventListener("click", () => setActiveTab("calendar"));
 
+  if (el.sharedImportModal) {
+    el.closeSharedImportBtn.addEventListener("click", () => {
+      closeSharedImportModal(true);
+      setStatus("Kept your current calendar unchanged.", false);
+    });
+    el.sharedImportCancelBtn.addEventListener("click", () => {
+      closeSharedImportModal(true);
+      setStatus("Kept your current calendar unchanged.", false);
+    });
+    el.sharedImportModal.addEventListener("click", (event) => {
+      if (event.target === el.sharedImportModal) {
+        closeSharedImportModal(true);
+        setStatus("Kept your current calendar unchanged.", false);
+      }
+    });
+    el.sharedImportLoadAllBtn.addEventListener("click", () => {
+      loadEntireSharedSchedule();
+    });
+    el.sharedImportChooseBtn.addEventListener("click", () => {
+      if (!state.sharedImport) return;
+      state.sharedImport.selectMode = true;
+      renderSharedImportModal();
+    });
+    el.sharedImportSelectAllBtn.addEventListener("click", () => {
+      if (!state.sharedImport) return;
+      for (const event of state.sharedImport.events) {
+        if (event.mergeStatus === "duplicate") continue;
+        event.include = true;
+      }
+      renderSharedImportModal();
+    });
+    el.sharedImportSelectNoneBtn.addEventListener("click", () => {
+      if (!state.sharedImport) return;
+      for (const event of state.sharedImport.events) event.include = false;
+      renderSharedImportModal();
+    });
+    el.sharedImportApplyBtn.addEventListener("click", () => {
+      addSelectedSharedEvents();
+    });
+  }
+
   el.searchInput.addEventListener("input", (event) => {
     state.filters.search = event.target.value.trim().toLowerCase();
+    persistProfile();
     renderAll();
   });
 
   el.dayFilter.addEventListener("change", (event) => {
     state.filters.day = event.target.value;
+    persistProfile();
     renderAll();
   });
 
   el.kindFilter.addEventListener("change", (event) => {
     state.filters.kind = event.target.value;
+    persistProfile();
     renderAll();
   });
 
   el.sessionTagFilter.addEventListener("change", (event) => {
     state.filters.sessionTag = event.target.value;
+    persistProfile();
     renderAll();
   });
 
   el.priorityFilter.addEventListener("change", (event) => {
     state.filters.priority = event.target.value;
+    persistProfile();
     renderAll();
   });
 
   if (el.conferenceSelect) {
     el.conferenceSelect.addEventListener("change", async (event) => {
+      persistProfile();
       await loadConference(event.target.value, true);
     });
   }
@@ -201,11 +910,13 @@ function bindEvents() {
       if (!canExpandSessionCard(session)) continue;
       state.expandedSessionIds.add(session.id);
     }
+    persistProfile();
     renderDayBoards();
   });
 
   el.collapseAllBtn.addEventListener("click", () => {
     state.expandedSessionIds.clear();
+    persistProfile();
     renderDayBoards();
   });
 
@@ -241,6 +952,10 @@ function bindEvents() {
   });
 
   el.addCustomEventBtn.addEventListener("click", () => {
+    if (isSharedReadOnlyMode()) {
+      setStatus("Shared schedules are read-only.", true);
+      return;
+    }
     state.showCustomForm = !state.showCustomForm;
     if (state.showCustomForm) primeCustomEventForm();
     renderCustomEventForm();
@@ -252,6 +967,10 @@ function bindEvents() {
   });
 
   el.saveCustomEventBtn.addEventListener("click", () => {
+    if (isSharedReadOnlyMode()) {
+      setStatus("Shared schedules are read-only.", true);
+      return;
+    }
     const parsed = readCustomEventFromForm();
     if (!parsed.ok) {
       setStatus(parsed.error, true);
@@ -274,6 +993,10 @@ function bindEvents() {
   });
 
   el.confirmUndecidedBtn.addEventListener("click", () => {
+    if (isSharedReadOnlyMode()) {
+      setStatus("Shared schedules are read-only.", true);
+      return;
+    }
     const items = buildPlanItems();
     const undecided = items.filter((item) => !getDecision(item.id));
     if (!undecided.length) {
@@ -289,6 +1012,10 @@ function bindEvents() {
   });
 
   el.removeUndecidedBtn.addEventListener("click", () => {
+    if (isSharedReadOnlyMode()) {
+      setStatus("Shared schedules are read-only.", true);
+      return;
+    }
     const items = buildPlanItems();
     const undecided = items.filter((item) => !getDecision(item.id));
     if (!undecided.length) {
@@ -343,6 +1070,7 @@ async function loadData(source) {
     loadSavedProfile();
     renderFilters();
     renderAll();
+    persistProfile();
     setStatus(
       `Loaded ${data.stats.paperCount} papers across ${data.stats.sessionCount} sessions for ${data.conference.name}. Dataset generated ${fmtDateTime(data.generatedAt)}.`,
       false
@@ -380,8 +1108,11 @@ function hydrateState(data, source) {
   state.customEvents = [];
   state.expandedSessionIds.clear();
   state.activeCalendarItemId = "";
+  state.share = shareController ? shareController.createInitialShareState() : null;
+  state.sharedImport = null;
   state.profileStorageKey = `conference-planner-profile-${data.conference.id}-v${PROFILE_VERSION}`;
   renderConferenceHeader();
+  if (shareController) shareController.renderComposer();
 }
 
 function getInitialConferenceId() {
@@ -426,6 +1157,13 @@ function resolveConferenceUi(data, source) {
 
 function renderConferenceHeader() {
   if (!state.data || !state.conferenceUi) return;
+  if (isSharedReadOnlyMode()) {
+    el.conferenceEyebrow.textContent = "Shared Schedule";
+    el.conferenceTitle.textContent = `${state.data.conference.name} Shared Calendar`;
+    el.conferenceSubtitle.textContent = "Viewing a read-only shared schedule in calendar view.";
+    document.title = `${state.data.conference.name} Shared Calendar`;
+    return;
+  }
   el.conferenceEyebrow.textContent = state.conferenceUi.eyebrow;
   el.conferenceTitle.textContent = state.conferenceUi.title;
   el.conferenceSubtitle.textContent = state.conferenceUi.subtitle;
@@ -798,6 +1536,7 @@ function makeSelectOption(value, label) {
 
 function renderAll() {
   if (!state.data) return;
+  renderSharedModeUi();
   renderTabs();
   renderCustomEventForm();
   renderDayBoards();
@@ -805,18 +1544,39 @@ function renderAll() {
 }
 
 function setActiveTab(tab) {
+  if (isSharedReadOnlyMode()) {
+    state.activeTab = "calendar";
+    renderTabs();
+    return;
+  }
   state.activeTab = tab === "calendar" ? "calendar" : "program";
+  persistProfile();
   renderTabs();
 }
 
 function renderTabs() {
-  const isProgram = state.activeTab === "program";
+  const isShared = isSharedReadOnlyMode();
+  const isProgram = !isShared && state.activeTab === "program";
   el.programTabBtn.classList.toggle("active", isProgram);
-  el.calendarTabBtn.classList.toggle("active", !isProgram);
+  el.calendarTabBtn.classList.toggle("active", !isProgram || isShared);
   el.programTabBtn.setAttribute("aria-selected", String(isProgram));
-  el.calendarTabBtn.setAttribute("aria-selected", String(!isProgram));
-  el.programTabPanel.classList.toggle("hidden", !isProgram);
-  el.calendarTabPanel.classList.toggle("hidden", isProgram);
+  el.calendarTabBtn.setAttribute("aria-selected", String(!isProgram || isShared));
+  el.programTabBtn.classList.toggle("hidden", isShared);
+  el.programTabPanel.classList.toggle("hidden", isShared || !isProgram);
+  el.calendarTabPanel.classList.toggle("hidden", !isShared && isProgram);
+}
+
+function renderSharedModeUi() {
+  const isShared = isSharedReadOnlyMode();
+  if (isShared) {
+    state.activeTab = "calendar";
+    state.showCustomForm = false;
+    if (shareController && state.share?.isOpen) shareController.closeComposer();
+  }
+  el.addCustomEventBtn.classList.toggle("hidden", isShared);
+  el.confirmUndecidedBtn.classList.toggle("hidden", isShared);
+  el.removeUndecidedBtn.classList.toggle("hidden", isShared);
+  if (el.shareScheduleBtn) el.shareScheduleBtn.classList.toggle("hidden", isShared);
 }
 
 function renderDayBoards() {
@@ -893,6 +1653,7 @@ function renderDayBoard(day, sessions) {
               state.expandedSessionIds.add(session.id);
             }
           }
+          persistProfile();
           renderDayBoards();
         });
         time.appendChild(slotToggle);
@@ -959,6 +1720,7 @@ function isSessionDetailsExpandable(session) {
 function toggleSessionExpanded(sessionId) {
   if (state.expandedSessionIds.has(sessionId)) state.expandedSessionIds.delete(sessionId);
   else state.expandedSessionIds.add(sessionId);
+  persistProfile();
 }
 
 function shouldShowSessionTrackBadge(session) {
@@ -1482,12 +2244,14 @@ function renderWeekCalendar(items) {
       event.title = `Open details: ${item.title}`;
       event.addEventListener("click", () => {
         state.activeCalendarItemId = item.id;
+        persistProfile();
         renderPlanner();
       });
       event.addEventListener("keydown", (evt) => {
         if (evt.key === "Enter" || evt.key === " ") {
           evt.preventDefault();
           state.activeCalendarItemId = item.id;
+          persistProfile();
           renderPlanner();
         }
       });
@@ -1500,7 +2264,8 @@ function renderWeekCalendar(items) {
       if (item.entityType === "paper") {
         meta.textContent = `${item.sessionTitle || "Paper Session"} • ${DECISION_LABEL[decision] || "Undecided"}`;
       } else if (item.entityType === "custom") {
-        meta.textContent = `Custom Event • ${DECISION_LABEL[decision] || "Undecided"}`;
+        const customLabel = labelForSharedEntityType(item.sharedEntityType);
+        meta.textContent = `${customLabel} • ${DECISION_LABEL[decision] || "Undecided"}`;
       } else {
         meta.textContent = `${KIND_LABEL[item.kind] || "Session"} • ${DECISION_LABEL[decision] || "Undecided"}`;
       }
@@ -1532,6 +2297,7 @@ function renderEventDetails(items) {
   const paper = active.entityType === "paper" ? state.paperMap.get(active.id.slice("paper:".length)) : null;
   const decision = getDecision(active.id);
   const dayLabel = fmtDay(isoDay(active.start));
+  const isSharedView = isSharedReadOnlyMode();
 
   const card = document.createElement("article");
   card.className = "details-card";
@@ -1546,16 +2312,18 @@ function renderEventDetails(items) {
 
   const list = document.createElement("div");
   list.className = "details-list";
+  const customTypeLabel = labelForSharedEntityType(active.sharedEntityType);
   const typeLabel =
     active.entityType === "paper"
       ? "Paper"
       : active.entityType === "custom"
-      ? "Custom Event"
+      ? customTypeLabel
       : `Session (${KIND_LABEL[active.kind] || active.kind})`;
   list.appendChild(detailRow("Type", typeLabel));
   list.appendChild(detailRow("Priority", LEVEL_LABEL[active.level] || active.level));
   if (session?.track) list.appendChild(detailRow("Topic", session.track));
   if (active.entityType === "custom" && active.description) list.appendChild(detailRow("Notes", active.description));
+  if (active.entityType === "custom" && active.sessionTitle) list.appendChild(detailRow("Session", active.sessionTitle));
   if (active.entityType === "paper") {
     list.appendChild(detailRow("Session", active.sessionTitle || session?.title || "Session"));
   } else {
@@ -1617,7 +2385,8 @@ function renderEventDetails(items) {
     detailsLinkBtn.href = active.detailsUrl;
     detailsLinkBtn.target = "_blank";
     detailsLinkBtn.rel = "noreferrer";
-    detailsLinkBtn.textContent = active.entityType === "paper" ? "Open Paper Details" : "Open Session Source";
+    detailsLinkBtn.textContent =
+      active.entityType === "paper" || active.sharedEntityType === "paper" ? "Open Paper Details" : "Open Session Source";
     linkRow.appendChild(detailsLinkBtn);
   }
 
@@ -1629,6 +2398,16 @@ function renderEventDetails(items) {
   const abstract = document.createElement("p");
   abstract.textContent = paper?.abstract || active.description || getSessionDescriptionForPlan(session) || "No additional details.";
   abstractWrap.append(abstractTitle, abstract);
+
+  if (isSharedView) {
+    const sharedHint = document.createElement("p");
+    sharedHint.className = "details-row";
+    sharedHint.textContent = "Read-only shared schedule.";
+    card.append(title, meta, list, abstractWrap, sharedHint);
+    if (linkRow.childElementCount > 0) card.appendChild(linkRow);
+    el.eventDetails.appendChild(card);
+    return;
+  }
 
   const noteWrap = document.createElement("div");
   noteWrap.className = "details-note-wrap";
@@ -1822,24 +2601,29 @@ function buildPlanItems() {
   }
 
   for (const custom of state.customEvents) {
+    const sharedEntityType = normalizeSharedEntityType(custom.shareEntityType || custom.entityType || "custom");
+    const hasSharedEntityType = sharedEntityType !== "custom";
+    const resolvedSessionTitle = String(custom.sessionTitle || "").trim();
+    const resolvedDescription = String(custom.description || custom.notes || "").trim();
     items.push({
       id: custom.id,
       entityType: "custom",
       level: normalizeLevel(custom.level || "interested"),
       title: custom.title,
       sessionId: "",
-      sessionTitle: "Custom Event",
+      sessionTitle: resolvedSessionTitle || (hasSharedEntityType ? `Shared ${sharedEntityType}` : "Custom Event"),
       kind: "event",
       location: custom.location || "TBD",
       start: custom.start,
       end: custom.end,
-      detailsUrl: "",
-      paperUrl: "",
-      description: custom.notes || "",
+      detailsUrl: String(custom.detailsUrl || ""),
+      paperUrl: String(custom.paperUrl || ""),
+      description: resolvedDescription,
       userNote: getEventNote(custom.id),
       dayId: `day-${isoDay(custom.start)}`,
       track: "Custom",
       authorsText: "",
+      sharedEntityType,
     });
   }
 
@@ -1864,6 +2648,10 @@ function removeItemFromPlan(item) {
 }
 
 function renderCustomEventForm() {
+  if (isSharedReadOnlyMode()) {
+    el.customEventFormWrap.classList.add("hidden");
+    return;
+  }
   el.customEventFormWrap.classList.toggle("hidden", !state.showCustomForm);
   el.addCustomEventBtn.textContent = state.showCustomForm ? "Close Custom Event" : "Add Custom Event";
 }
@@ -1922,8 +2710,8 @@ function normalizeCustomEvent(raw) {
   if (!raw || typeof raw !== "object") return null;
   const id = typeof raw.id === "string" && raw.id.startsWith("custom:") ? raw.id : `custom:${slug(`${raw.title || "event"}-${raw.start || ""}`)}`;
   const title = String(raw.title || "").trim();
-  const start = String(raw.start || "").trim();
-  const end = String(raw.end || "").trim();
+  const start = normalizeLocalDateTimeText(raw.start);
+  const end = normalizeLocalDateTimeText(raw.end);
   if (!title || !start || !end) return null;
   const startDate = new Date(start);
   const endDate = new Date(end);
@@ -1931,11 +2719,17 @@ function normalizeCustomEvent(raw) {
   return {
     id,
     title,
-    start: toLocalIso(startDate),
-    end: toLocalIso(endDate),
+    start,
+    end,
     location: String(raw.location || "").trim(),
     notes: String(raw.notes || "").trim(),
     level: normalizeLevel(raw.level || "interested"),
+    description: String(raw.description || "").trim(),
+    sessionTitle: String(raw.sessionTitle || "").trim(),
+    shareEntityType: normalizeSharedEntityType(raw.shareEntityType || raw.entityType || ""),
+    sourceEventId: String(raw.sourceEventId || "").trim(),
+    detailsUrl: String(raw.detailsUrl || "").trim(),
+    paperUrl: String(raw.paperUrl || "").trim(),
   };
 }
 
@@ -2132,6 +2926,7 @@ function applyProfile(profile, persistAfterApply) {
   const sourceDecisions = profile?.finalDecisions || {};
   const sourceNotes = profile?.eventNotes || {};
   const sourceCustomEvents = Array.isArray(profile?.customEvents) ? profile.customEvents : [];
+  const sourceUiState = profile?.uiState && typeof profile.uiState === "object" ? profile.uiState : null;
 
   for (const [sessionId, level] of Object.entries(sourceSessions)) {
     if (!state.sessionMap.has(sessionId)) continue;
@@ -2167,13 +2962,15 @@ function applyProfile(profile, persistAfterApply) {
   state.decisions = nextDecisions;
   state.eventNotes = nextNotes;
   state.customEvents = nextCustomEvents;
+  state.expandedSessionIds.clear();
   state.activeCalendarItemId = "";
+  applyUiState(sourceUiState);
   if (persistAfterApply) persistProfile();
   renderAll();
 }
 
 function persistProfile() {
-  if (!state.profileStorageKey) return;
+  if (!state.profileStorageKey || state.suspendProfilePersistence || isSharedReadOnlyMode()) return;
   localStorage.setItem(state.profileStorageKey, JSON.stringify(buildProfilePayload()));
 }
 
@@ -2187,7 +2984,43 @@ function buildProfilePayload() {
     finalDecisions: state.decisions,
     eventNotes: state.eventNotes,
     customEvents: state.customEvents,
+    uiState: buildUiStatePayload(),
   };
+}
+
+function buildUiStatePayload() {
+  return {
+    activeTab: state.activeTab,
+    filters: {
+      search: String(state.filters.search || ""),
+      day: String(state.filters.day || "all"),
+      kind: String(state.filters.kind || "all"),
+      sessionTag: String(state.filters.sessionTag || "all"),
+      priority: String(state.filters.priority || "all"),
+    },
+    expandedSessionIds: [...state.expandedSessionIds],
+    activeCalendarItemId: String(state.activeCalendarItemId || ""),
+  };
+}
+
+function applyUiState(rawUiState) {
+  if (!rawUiState || typeof rawUiState !== "object") return;
+  const filters = rawUiState.filters && typeof rawUiState.filters === "object" ? rawUiState.filters : {};
+  state.activeTab = rawUiState.activeTab === "calendar" ? "calendar" : "program";
+  state.filters.search = String(filters.search || "").trim().toLowerCase();
+  state.filters.day = String(filters.day || "all");
+  state.filters.kind = String(filters.kind || "all");
+  state.filters.sessionTag = String(filters.sessionTag || "all");
+  const priority = String(filters.priority || "all");
+  state.filters.priority = priority === "selected" || priority === "must_go" ? priority : "all";
+  if (Array.isArray(rawUiState.expandedSessionIds)) {
+    state.expandedSessionIds = new Set(
+      rawUiState.expandedSessionIds
+        .map((sessionId) => String(sessionId))
+        .filter((sessionId) => state.sessionMap.has(sessionId))
+    );
+  }
+  state.activeCalendarItemId = String(rawUiState.activeCalendarItemId || "");
 }
 
 function getCalendarExportItems() {
@@ -2337,6 +3170,13 @@ function toLocalIso(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(
     date.getMinutes()
   )}:${pad2(date.getSeconds())}`;
+}
+
+function toDatetimeLocal(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(
+    date.getMinutes()
+  )}`;
 }
 
 function isoDay(isoDateTime) {

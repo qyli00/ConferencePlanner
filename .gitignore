@@ -1,3 +1,11 @@
-scripts/
 .DS_Store
-data/*/raw/
+frontend/node_modules/
+frontend/dist/
+backend/data/*/raw/
+backend/userdata/
+backend/scripts/
+__pycache__/
+*.py[cod]
+*.log
+.env
+.env.*

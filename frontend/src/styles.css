@@ -320,10 +320,39 @@ select:focus {
   align-items: center;
 }
 
+.planner-main-actions {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.planner-left-actions {
+  display: inline-flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .export-btn {
   padding: 0.74rem 0.98rem;
   font-size: inherit;
   font-weight: 700;
+}
+
+.share-schedule-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.btn-icon-share {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .explorer-actions {
@@ -335,6 +364,611 @@ select:focus {
 
 .hidden {
   display: none !important;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 24, 18, 0.42);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-card {
+  width: min(1200px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 1px solid #dbe7dd;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 44px rgba(10, 24, 18, 0.22);
+  padding: 0.95rem;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.modal-head h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.modal-close-btn {
+  border: 1px solid #d7e3da;
+  border-radius: 10px;
+  background: #f2f7f3;
+  color: #315446;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.38rem 0.6rem;
+  cursor: pointer;
+}
+
+.modal-subtitle {
+  margin: 0.5rem 0 0;
+  color: #476356;
+  font-size: 0.84rem;
+}
+
+.share-settings {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.72rem;
+  align-items: start;
+}
+
+.share-notes-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #284b3c;
+}
+
+.share-notes-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.share-mask-group {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 0.45rem 0.52rem;
+  border: 1px solid #dce8de;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.share-mask-group .share-notes-toggle {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.share-list-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+}
+
+.share-list-actions .btn {
+  padding: 0.48rem 0.68rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.share-calendar-wrap {
+  margin-top: 0.64rem;
+  display: grid;
+  gap: 0.62rem;
+}
+
+.share-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.52rem;
+}
+
+.share-calendar-day {
+  border: 1px solid #dce8de;
+  border-radius: 12px;
+  background: #fbfdfb;
+  padding: 0.48rem;
+  min-height: 160px;
+}
+
+.share-calendar-day-title {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #295040;
+}
+
+.share-calendar-events {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.38rem;
+}
+
+.share-calendar-event {
+  width: 100%;
+  border: 1px solid #d4e2d8;
+  border-left: 5px solid #89a896;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 0.35rem 0.42rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.share-calendar-event.excluded {
+  opacity: 0.58;
+}
+
+.share-calendar-event.active {
+  border-color: #94c6ad;
+  border-left-color: #0f8b63;
+  box-shadow: 0 0 0 2px rgba(15, 139, 99, 0.15);
+}
+
+.share-calendar-event-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.share-calendar-event-row input {
+  width: auto;
+  margin-top: 0.1rem;
+}
+
+.share-calendar-event-title {
+  margin: 0;
+  font-size: 0.77rem;
+  font-weight: 700;
+  color: #1a3b2c;
+}
+
+.share-calendar-event-meta,
+.share-calendar-event-kind {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: #476356;
+}
+
+.share-event-editor-wrap {
+  margin-top: 0.68rem;
+}
+
+.share-event-editor {
+  border: 1px solid #dce8de;
+  border-radius: 12px;
+  background: #fbfdfb;
+  padding: 0.62rem;
+}
+
+.share-event-editor.excluded {
+  opacity: 0.58;
+  background: #f6f8f6;
+}
+
+.share-event-editor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.share-include-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: #173a2b;
+  font-weight: 600;
+}
+
+.share-include-label input {
+  width: auto;
+}
+
+.share-event-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+
+.share-field {
+  display: grid;
+  gap: 0.3rem;
+  color: #48655a;
+  font-size: 0.76rem;
+}
+
+.share-field input,
+.share-field textarea {
+  width: 100%;
+  border: 1px solid #d5e2d8;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  padding: 0.46rem 0.55rem;
+}
+
+.share-field textarea {
+  min-height: 66px;
+  resize: vertical;
+}
+
+.share-field input:disabled,
+.share-field textarea:disabled {
+  background: #f1f4f1;
+  color: #6c7f73;
+}
+
+.share-publish-row {
+  margin-top: 0.74rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+#shareResultWrap.modal {
+  z-index: 60;
+  display: block;
+  padding: 0;
+}
+
+.share-result-card {
+  position: fixed;
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(72vh, 620px);
+  overflow: auto;
+  margin: 0;
+}
+
+.share-result-card label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.share-action-row {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.share-social-btn {
+  width: 2.3rem;
+  height: 2.3rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-social-icon {
+  width: 1.08rem;
+  height: 1.08rem;
+  fill: currentColor;
+}
+
+.share-social-x {
+  color: #111827;
+}
+
+.share-social-facebook {
+  color: #1f4fb3;
+}
+
+.share-social-linkedin {
+  color: #0a66c2;
+}
+
+.share-social-bluesky {
+  color: #0f73ff;
+}
+
+.shared-import-modal {
+  width: min(980px, 100%);
+}
+
+.shared-import-summary {
+  margin-top: 0.62rem;
+  border: 1px solid #dce8de;
+  border-radius: 10px;
+  background: #fbfdfb;
+  padding: 0.52rem 0.6rem;
+  font-size: 0.79rem;
+  color: #3a5b4b;
+}
+
+.shared-import-preview {
+  margin-top: 0.62rem;
+  border: 1px solid #dce8de;
+  border-radius: 10px;
+  background: #fbfdfb;
+  padding: 0.56rem 0.6rem 0.62rem;
+}
+
+.shared-import-preview-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #204f3d;
+}
+
+.shared-import-preview-subtitle {
+  margin: 0.18rem 0 0;
+  font-size: 0.74rem;
+  color: #466356;
+}
+
+.shared-import-merge-legend {
+  margin-top: 0.46rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.shared-import-merge-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid #d2e1d5;
+  padding: 0.1rem 0.38rem;
+  font-size: 0.66rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.shared-import-merge-pill.current {
+  border-color: #c7d6cc;
+  background: #edf3ef;
+  color: #335247;
+}
+
+.shared-import-merge-pill.incoming-clean {
+  border-color: #9bd8b9;
+  background: #e4f6ec;
+  color: #1d5a43;
+}
+
+.shared-import-merge-pill.incoming-conflict {
+  border-color: #e6b684;
+  background: #fff0dd;
+  color: #8a4a1d;
+}
+
+.shared-import-merge-pill.incoming-excluded {
+  border-color: #cfd9d1;
+  background: #f2f5f3;
+  color: #5d7368;
+}
+
+.shared-import-merge-shell {
+  margin-top: 0.5rem;
+}
+
+.merge-calendar-event {
+  padding: 0.22rem 0.3rem;
+  border-left-width: 4px;
+  box-shadow: none;
+}
+
+.merge-calendar-event .calendar-event-title {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.merge-calendar-event.current {
+  background: #edf3ef;
+  border-color: #c8d6cd;
+  border-left-color: #8ea496;
+  color: #2f4f3f;
+  opacity: 0.88;
+}
+
+.merge-calendar-event.incoming-clean {
+  background: #dcf5e7;
+  border-color: #95deb9;
+  border-left-color: #0f8b63;
+}
+
+.merge-calendar-event.incoming-conflict {
+  background: #fff0db;
+  border-color: #edc38c;
+  border-left-color: #cc7a1f;
+}
+
+.merge-calendar-event.incoming-excluded {
+  opacity: 0.35;
+  filter: saturate(0.35);
+}
+
+.merge-calendar-event.selectable {
+  cursor: pointer;
+}
+
+.merge-calendar-event:not(.selectable) {
+  cursor: default;
+}
+
+.merge-calendar-event:not(.selectable):hover {
+  transform: none;
+}
+
+.shared-import-calendar-days {
+  margin-top: 0.48rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+}
+
+.shared-import-calendar-day {
+  border: 1px solid #dbe7dd;
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 0.4rem 0.44rem;
+}
+
+.shared-import-calendar-day-title {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #274d3e;
+}
+
+.shared-import-calendar-events {
+  margin-top: 0.36rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.shared-import-calendar-event {
+  margin: 0;
+}
+
+.shared-import-actions {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.shared-import-selection {
+  margin-top: 0.78rem;
+  border-top: 1px solid #e2ebe3;
+  padding-top: 0.72rem;
+}
+
+.shared-import-selection-head {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.shared-import-list {
+  margin-top: 0.56rem;
+  max-height: 440px;
+  overflow: auto;
+  display: block;
+}
+
+.shared-import-item {
+  border: 1px solid #dbe7dd;
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 0.44rem 0.52rem;
+}
+
+.shared-import-item-head {
+  display: flex;
+  align-items: start;
+  gap: 0.42rem;
+}
+
+.shared-import-item-head input {
+  width: auto;
+  margin-top: 0.12rem;
+}
+
+.shared-import-item-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #193a2d;
+}
+
+.shared-import-item-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  color: #4a665a;
+}
+
+.shared-import-badges {
+  margin-top: 0.26rem;
+  display: inline-flex;
+  gap: 0.28rem;
+  flex-wrap: wrap;
+}
+
+.merge-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid #d2e1d5;
+  background: #eef5ef;
+  color: #395848;
+  padding: 0.09rem 0.35rem;
+  font-size: 0.66rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.merge-badge.clean {
+  border-color: #9bd8b9;
+  background: #e4f6ec;
+  color: #1d5a43;
+}
+
+.merge-badge.conflict {
+  border-color: #e6b6a0;
+  background: #fdf0e9;
+  color: #8c431d;
+}
+
+.merge-badge.duplicate {
+  border-color: #bcd2ea;
+  background: #edf4fc;
+  color: #1f4f79;
+}
+
+.shared-import-conflicts {
+  margin: 0.3rem 0 0;
+  padding-left: 1rem;
+  color: #5e3f2d;
+  font-size: 0.72rem;
+}
+
+.shared-import-diff {
+  margin-top: 0.32rem;
+  border-left: 2px solid #dbe7dd;
+  padding-left: 0.48rem;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.shared-import-diff-line {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #3f5d50;
+}
+
+.shared-import-conflicts li {
+  margin: 0.12rem 0 0;
+  line-height: 1.25;
+}
+
+.shared-import-footer {
+  margin-top: 0.6rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .custom-event-form {
@@ -1039,6 +1673,60 @@ select:focus {
   font-size: 0.88rem;
 }
 
+.share-view-panel .panel-head {
+  border-bottom: 1px solid #e8efe8;
+}
+
+.share-status {
+  padding: 0.74rem 1.12rem 0.1rem;
+}
+
+.share-import-hint {
+  padding: 0.16rem 1.12rem 0;
+  margin-top: 0.2rem;
+  font-size: 0.83rem;
+}
+
+.share-event-container {
+  padding: 0.1rem 0.9rem 0.92rem;
+  display: grid;
+  gap: 0.84rem;
+}
+
+.share-day-section {
+  border: 1px solid #dce7dd;
+  border-radius: 14px;
+  background: #fbfdfb;
+  padding: 0.68rem;
+}
+
+.share-event-list {
+  margin-top: 0.52rem;
+  display: grid;
+  gap: 0.52rem;
+}
+
+.share-event-card {
+  border: 1px solid #dce6dd;
+  border-left: 5px solid #8ea999;
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 0.56rem 0.6rem;
+}
+
+.share-event-head {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.share-event-card .details-list {
+  margin-top: 0.44rem;
+}
+
+.share-event-card .details-linkrow {
+  margin-top: 0.5rem;
+}
+
 @keyframes drift {
   from {
     transform: translateY(0) scale(1);
@@ -1096,5 +1784,9 @@ select:focus {
 
   .slot-sessions {
     grid-template-columns: 1fr;
+  }
+
+  .share-result-card {
+    width: min(92vw, 460px);
   }
 }
